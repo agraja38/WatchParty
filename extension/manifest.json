@@ -1,0 +1,89 @@
+{
+  "manifest_version": 3,
+  "name": "WatchParty",
+  "version": "0.1.0",
+  "description": "Sync official streaming playback with room chat and two-person WebRTC calls without touching video streams.",
+  "action": {
+    "default_title": "WatchParty",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "permissions": ["storage", "tabs", "activeTab"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://youtube.com/*",
+    "https://*.youtube.com/*",
+    "https://youtu.be/*",
+    "https://www.netflix.com/*",
+    "https://*.netflix.com/*",
+    "https://www.disneyplus.com/*",
+    "https://*.disneyplus.com/*",
+    "https://www.primevideo.com/*",
+    "https://*.primevideo.com/*",
+    "https://www.amazon.com/*",
+    "https://*.amazon.com/*",
+    "https://www.hulu.com/*",
+    "https://*.hulu.com/*",
+    "https://www.max.com/*",
+    "https://*.max.com/*",
+    "https://www.hbomax.com/*",
+    "https://*.hbomax.com/*",
+    "https://www.paramountplus.com/*",
+    "https://*.paramountplus.com/*",
+    "https://watchparty-8c5f9-default-rtdb.firebaseio.com/*",
+    "https://identitytoolkit.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://*.youtube.com/*",
+        "https://youtu.be/*",
+        "https://www.netflix.com/*",
+        "https://*.netflix.com/*",
+        "https://www.disneyplus.com/*",
+        "https://*.disneyplus.com/*",
+        "https://www.primevideo.com/*",
+        "https://*.primevideo.com/*",
+        "https://www.amazon.com/*",
+        "https://*.amazon.com/*",
+        "https://www.hulu.com/*",
+        "https://*.hulu.com/*",
+        "https://www.max.com/*",
+        "https://*.max.com/*",
+        "https://www.hbomax.com/*",
+        "https://*.hbomax.com/*",
+        "https://www.paramountplus.com/*",
+        "https://*.paramountplus.com/*"
+      ],
+      "js": [
+        "firebase.js",
+        "adapters/baseAdapter.js",
+        "adapters/generic.js",
+        "adapters/youtube.js",
+        "adapters/netflix.js",
+        "adapters/disney.js",
+        "adapters/prime.js",
+        "adapters/hulu.js",
+        "adapters/max.js",
+        "adapters/paramount.js",
+        "sync.js",
+        "chat.js",
+        "webrtc.js",
+        "ui.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
