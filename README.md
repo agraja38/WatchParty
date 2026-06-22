@@ -68,7 +68,7 @@ docs/
 The extension is preconfigured for the `watchparty-8c5f9` Firebase project and Realtime Database URL:
 
 ```text
-https://watchparty-8c5f9-default-rtdb.firebaseio.com
+https://watchparty-8c5f9-default-rtdb.asia-southeast1.firebasedatabase.app
 ```
 
 Manual setup still required:

@@ -2,7 +2,7 @@
   const CONFIG = {
     apiKey: "AIzaSyBJjaiKbiNcvcf6yH9_VcWhq_NKkYis8dQ",
     authDomain: "watchparty-8c5f9.firebaseapp.com",
-    databaseURL: "https://watchparty-8c5f9-default-rtdb.firebaseio.com",
+    databaseURL: "https://watchparty-8c5f9-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "watchparty-8c5f9",
     storageBucket: "watchparty-8c5f9.firebasestorage.app",
     messagingSenderId: "263561927466",
