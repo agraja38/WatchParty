@@ -1,12 +1,22 @@
-# Firebase Rules
+# Firebase Realtime Database Security Rules
 
-WatchParty uses Firebase Anonymous Authentication and Firebase Realtime Database.
+WatchParty relies on Firebase Anonymous Authentication to secure your database. You must configure rules to authorize read and write access for authenticated users while preventing abuse.
 
-The Firebase web API key is public by design for Firebase web apps. Protect the database with rules.
+---
 
-## Example Development Rules
+## How to Apply Rules
 
-These rules require anonymous authentication, allow authenticated users to read rooms, limit writes to expected room paths, and prevent unauthenticated access.
+1.  Open the [Firebase Console](https://console.firebase.google.com/).
+2.  Navigate to **Build** > **Realtime Database** from the sidebar.
+3.  Click the **Rules** tab at the top of the panel.
+4.  Paste the JSON rules block below into the editor.
+5.  Click **Publish** to apply the configuration.
+
+---
+
+## Recommended Rules
+
+These rules require all readers and writers to be authenticated via Firebase Anonymous Authentication, restrict writing of user profiles to the owner of that user ID, validate that message structures match schema boundaries, and limit room chat messages to 500 characters.
 
 ```json
 {
@@ -41,19 +51,23 @@ These rules require anonymous authentication, allow authenticated users to read 
 }
 ```
 
-## Production Hardening Ideas
+---
 
-- Add room membership checks so only users listed under `rooms/{roomId}/users/{auth.uid}` can write state, chat, and signaling.
-- Add `.validate` rules for numeric playback time and timestamp bounds.
-- Add Cloud Functions or scheduled cleanup if rooms should expire automatically.
-- Consider App Check for abuse reduction.
-- Use stricter WebRTC signaling validation before public launch.
+## Database Schema Reference
 
-## Database Paths
+For debugging or customized rule development, WatchParty structures database paths as follows:
 
-```text
-rooms/{roomId}/state
-rooms/{roomId}/chat/{messageId}
-rooms/{roomId}/users/{userId}
-rooms/{roomId}/webrtc
-```
+*   **`rooms/{roomId}/meta`**: Room creation and schema details.
+*   **`rooms/{roomId}/state`**: Active playback state coordinates (paused, playing, current time, active adapter name, video title).
+*   **`rooms/{roomId}/users/{userId}`**: Display name, online presence, and time joined.
+*   **`rooms/{roomId}/chat/{messageId}`**: Temporary room text messages.
+*   **`rooms/{roomId}/webrtc`**: Peer connection signal offers, answers, and ICE candidate paths.
+
+---
+
+## Production Security Recommendations
+
+For public deployments, consider these extra precautions:
+*   **App Check**: Integrate Firebase App Check to prevent unauthorized apps (non-extension browsers) from calling your database.
+*   **Room Expiry**: Write a cloud function or cron task to sweep and delete database directories of inactive rooms older than 24 hours.
+*   **WebRTC Validation**: Require users writing to `webrtc` paths to be registered members of the room under `rooms/{roomId}/users/{auth.uid}`.

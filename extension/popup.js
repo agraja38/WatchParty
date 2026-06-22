@@ -41,10 +41,22 @@
     els.leaveRoom.addEventListener("click", leaveRoom);
     els.sendChat.addEventListener("click", sendChat);
     els.chatInput.addEventListener("keydown", (event) => { if (event.key === "Enter") sendChat(); });
-    els.startCall.addEventListener("click", () => sendToActiveTab({ type: "WATCHPARTY_START_CALL" }));
-    els.endCall.addEventListener("click", () => sendToActiveTab({ type: "WATCHPARTY_END_CALL" }));
-    els.toggleMute.addEventListener("click", () => sendToActiveTab({ type: "WATCHPARTY_TOGGLE_MUTE" }));
-    els.toggleCamera.addEventListener("click", () => sendToActiveTab({ type: "WATCHPARTY_TOGGLE_CAMERA" }));
+    els.startCall.addEventListener("click", async () => { await sendToActiveTab({ type: "WATCHPARTY_START_CALL" }); refreshTabStatus(); });
+    els.endCall.addEventListener("click", async () => { await sendToActiveTab({ type: "WATCHPARTY_END_CALL" }); refreshTabStatus(); });
+    els.toggleMute.addEventListener("click", async () => { await sendToActiveTab({ type: "WATCHPARTY_TOGGLE_MUTE" }); refreshTabStatus(); });
+    els.toggleCamera.addEventListener("click", async () => { await sendToActiveTab({ type: "WATCHPARTY_TOGGLE_CAMERA" }); refreshTabStatus(); });
+    
+    document.getElementById("roomCodeContainer")?.addEventListener("click", () => {
+      if (roomId && roomId !== "None") {
+        navigator.clipboard.writeText(roomId).then(() => {
+          const icon = document.querySelector(".copy-icon");
+          if (icon) {
+            icon.textContent = "✓";
+            setTimeout(() => { icon.textContent = "📋"; }, 2000);
+          }
+        }).catch(() => undefined);
+      }
+    });
   }
 
   async function saveDisplayName() {
@@ -127,8 +139,10 @@
     if (response?.platform) {
       els.platformStatus.textContent = `${response.platform}: ${response.canControl ? "ready to sync" : "waiting for video"}`;
       els.callStatus.textContent = roomId ? "Call controls target this tab." : "Join a room before starting a call.";
+      updateCallUi(response.callActive, response.micMuted, response.cameraOff);
     } else {
       els.platformStatus.textContent = "Open a supported streaming tab to sync playback.";
+      updateCallUi(false, false, false);
     }
   }
 
@@ -151,6 +165,27 @@
     els.currentRoom.textContent = roomId || "None";
     els.leaveRoom.disabled = !roomId;
     setStatus(roomId ? "Connected" : "Disconnected");
+    
+    if (roomId) {
+      document.body.classList.remove("wp-no-room");
+      document.body.classList.add("wp-in-room");
+    } else {
+      document.body.classList.remove("wp-in-room");
+      document.body.classList.add("wp-no-room");
+    }
+  }
+
+  function updateCallUi(active, micMuted, cameraOff) {
+    els.startCall.style.display = active ? "none" : "block";
+    els.endCall.style.display = active ? "block" : "none";
+    els.toggleMute.style.display = active ? "block" : "none";
+    els.toggleCamera.style.display = active ? "block" : "none";
+
+    els.toggleMute.textContent = micMuted ? "Unmute mic" : "Mute mic";
+    els.toggleMute.classList.toggle("warning", micMuted);
+
+    els.toggleCamera.textContent = cameraOff ? "Camera on" : "Camera off";
+    els.toggleCamera.classList.toggle("warning", cameraOff);
   }
 
   function setStatus(text) {

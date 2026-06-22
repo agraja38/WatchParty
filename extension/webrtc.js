@@ -39,6 +39,7 @@
 
       this.ui?.setLocalStream(this.localStream);
       this.ui?.setRemoteStream(this.remoteStream);
+      this.ui?.setCallState?.({ active: true, micMuted: this.micMuted, cameraOff: this.cameraOff });
       this.createPeer();
       await this.listenForSignals();
 
@@ -127,6 +128,7 @@
       this.micMuted = !this.micMuted;
       this.localStream?.getAudioTracks().forEach((track) => { track.enabled = !this.micMuted; });
       this.ui?.setCallStatus(this.micMuted ? "Microphone muted." : "Microphone on.");
+      this.ui?.setCallState?.({ active: true, micMuted: this.micMuted, cameraOff: this.cameraOff });
       return this.micMuted;
     }
 
@@ -134,6 +136,7 @@
       this.cameraOff = !this.cameraOff;
       this.localStream?.getVideoTracks().forEach((track) => { track.enabled = !this.cameraOff; });
       this.ui?.setCallStatus(this.cameraOff ? "Camera off." : "Camera on.");
+      this.ui?.setCallState?.({ active: true, micMuted: this.micMuted, cameraOff: this.cameraOff });
       return this.cameraOff;
     }
 
@@ -144,6 +147,7 @@
       this.localStream = null;
       this.ui?.setLocalStream(null);
       this.ui?.setRemoteStream(null);
+      this.ui?.setCallState?.({ active: false, micMuted: false, cameraOff: false });
       await this.firebase.remove(`rooms/${this.roomId}/webrtc`).catch(() => undefined);
       this.ui?.setCallStatus("Call ended.");
     }

@@ -6,7 +6,7 @@
   <title>WatchParty</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body class="wp-popup-body">
+<body class="wp-popup-body wp-no-room">
   <main class="wp-popup">
     <header class="wp-popup-header">
       <div>
@@ -19,20 +19,28 @@
     <section class="panel">
       <label for="displayName">Display name</label>
       <input id="displayName" maxlength="32" placeholder="Movie buddy">
-      <div class="button-row">
+      
+      <div class="button-row room-inactive-only">
         <button id="createRoom">Create room</button>
-        <button id="leaveRoom" class="secondary">Leave room</button>
       </div>
-      <label for="joinCode">Join room</label>
-      <div class="join-row">
+
+      <label for="joinCode" class="room-inactive-only">Join room</label>
+      <div class="join-row room-inactive-only">
         <input id="joinCode" maxlength="8" placeholder="ABC123">
         <button id="joinRoom">Join</button>
       </div>
-      <p class="room-line">Current room: <strong id="currentRoom">None</strong></p>
+
+      <div class="room-active-only">
+        <p class="room-line">Current room: <span id="roomCodeContainer" class="room-code-badge" title="Click to copy"><strong id="currentRoom">None</strong> <span class="copy-icon">📋</span></span></p>
+        <div class="button-row">
+          <button id="leaveRoom" class="danger">Leave room</button>
+        </div>
+      </div>
+
       <p class="hint" id="platformStatus">Open a supported streaming tab to sync playback.</p>
     </section>
 
-    <section class="panel chat-panel">
+    <section class="panel chat-panel room-active-only">
       <h2>Room chat</h2>
       <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
       <div class="chat-compose">
@@ -41,14 +49,14 @@
       </div>
     </section>
 
-    <section class="panel call-panel">
+    <section class="panel call-panel room-active-only">
       <h2>2-person call</h2>
       <p id="callStatus" class="hint">Start from a supported streaming tab.</p>
       <div class="button-grid">
         <button id="startCall">Start call</button>
-        <button id="endCall" class="secondary">End call</button>
-        <button id="toggleMute" class="secondary">Mute mic</button>
-        <button id="toggleCamera" class="secondary">Camera off</button>
+        <button id="endCall" class="secondary" style="display: none;">End call</button>
+        <button id="toggleMute" class="secondary" style="display: none;">Mute mic</button>
+        <button id="toggleCamera" class="secondary" style="display: none;">Camera off</button>
       </div>
     </section>
   </main>

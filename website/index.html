@@ -3,54 +3,93 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WatchParty</title>
+  <title>WatchParty - Synchronized Official Streaming Playback</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="hero">
-    <nav>
-      <strong>WatchParty</strong>
-      <a href="https://github.com/agraja38/WatchParty">GitHub</a>
+    <nav class="container">
+      <div class="logo">
+        <span class="logo-accent">Watch</span>Party
+      </div>
+      <a class="nav-link" href="https://github.com/agraja38/WatchParty" target="_blank" rel="noopener">GitHub Repository</a>
     </nav>
-    <div class="hero-grid">
-      <section>
-        <p class="eyebrow">Teleparty-style sync, safer boundaries</p>
-        <h1>Watch together from your own official streaming accounts.</h1>
-        <p class="lede">WatchParty syncs play, pause, seek, chat, and a two-person WebRTC call without touching video streams or DRM-protected content.</p>
-        <a class="cta" href="https://github.com/agraja38/WatchParty">View on GitHub</a>
+    
+    <div class="hero-grid container">
+      <section class="hero-content">
+        <p class="eyebrow">Privacy-First Synchronization</p>
+        <h1>Watch together from your own official accounts.</h1>
+        <p class="lede">WatchParty syncs play, pause, seek, room chat, and a 2-person WebRTC video call. Seamless coordination without touching DRM or copying video streams.</p>
+        <div class="actions">
+          <a class="cta" href="https://github.com/agraja38/WatchParty" target="_blank" rel="noopener">Get Extension</a>
+          <a class="cta secondary-cta" href="#setup">Setup Guide</a>
+        </div>
       </section>
-      <aside class="card">
+      
+      <aside class="card sync-features">
         <h2>What it syncs</h2>
         <ul>
-          <li>Play and pause</li>
-          <li>Seek and current time</li>
-          <li>Room chat</li>
-          <li>Two-person audio/video call</li>
+          <li>
+            <span class="bullet-icon">⚡</span>
+            <div>
+              <strong>Playback State</strong>
+              <p>Play, pause, seek position, and current time are synchronized instantly.</p>
+            </div>
+          </li>
+          <li>
+            <span class="bullet-icon">💬</span>
+            <div>
+              <strong>Room Chat</strong>
+              <p>Send messages in real-time within the popup or the on-page overlay.</p>
+            </div>
+          </li>
+          <li>
+            <span class="bullet-icon">📞</span>
+            <div>
+              <strong>2-Person Call</strong>
+              <p>WebRTC video and audio stream directly peer-to-peer to your buddy.</p>
+            </div>
+          </li>
         </ul>
       </aside>
     </div>
   </header>
 
-  <main>
-    <section class="section-grid">
-      <article>
+  <main class="container">
+    <section id="features" class="section-grid">
+      <article class="feature-card">
+        <div class="card-icon">🚀</div>
         <h2>Features</h2>
-        <p>Create a short room code, invite a friend, and keep official players in step. YouTube and generic HTML5 video support are fully implemented; major streaming platforms use safe best-effort HTML5 detection only.</p>
+        <p>Create a short, randomized room code, invite a friend, and keep your streaming players in step. Safe HTML5 video player integration supports YouTube and generic players, alongside passive detection for major streaming sites.</p>
       </article>
-      <article>
+      
+      <article class="feature-card" id="setup">
+        <div class="card-icon">🛠️</div>
         <h2>Setup</h2>
         <ol>
-          <li>Download or clone the repository.</li>
-          <li>Open your Chromium-based browser extension settings.</li>
-          <li>Enable Developer Mode.</li>
-          <li>Load the `extension/` folder unpacked.</li>
+          <li>Download or clone the WatchParty repository from GitHub.</li>
+          <li>Open your Chromium browser and navigate to <code>chrome://extensions</code> (or <code>edge://extensions</code>).</li>
+          <li>Enable <strong>Developer Mode</strong> at the top right.</li>
+          <li>Click <strong>Load unpacked</strong> and select the <code>extension/</code> folder.</li>
         </ol>
       </article>
-      <article>
+      
+      <article class="feature-card">
+        <div class="card-icon">🔒</div>
         <h2>Privacy Summary</h2>
-        <p>WatchParty stores room state, chat, presence, and WebRTC signaling in Firebase. It does not store, relay, decrypt, or capture streaming video.</p>
+        <p>WatchParty does not capture, record, stream, or rehost video files or decryption keys. Rooms, peer-to-peer WebRTC signals, and temporary chat messages are coordinated securely via Firebase.</p>
       </article>
     </section>
   </main>
+
+  <footer>
+    <div class="container footer-content">
+      <p>&copy; 2026 WatchParty. Open source under the MIT License.</p>
+      <p>Not affiliated with or endorsed by any streaming service provider.</p>
+    </div>
+  </footer>
 </body>
 </html>

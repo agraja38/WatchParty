@@ -1,114 +1,89 @@
 # WatchParty
 
-WatchParty is a Manifest V3 browser extension for syncing playback on official streaming websites. It is designed for Chrome, Edge, Brave, Opera, and other Chromium-based browsers first, with a project layout that can support Firefox later.
+WatchParty is a Manifest V3 browser extension for synchronizing video playback on official streaming websites. It is designed first for Chromium-based browsers (Chrome, Edge, Brave, Opera) and structured to support Firefox in the future.
 
-WatchParty syncs playback state only: play, pause, seek position, current time, platform name, and a safe title/video identity when the page exposes one. It also includes room chat and a two-person audio/video call using WebRTC.
+WatchParty syncs playback state only—such as play, pause, current playback position, and active streaming platform. It also includes room chat and a two-person WebRTC video/audio call.
 
-## What WatchParty Does
+> [!IMPORTANT]
+> **No Video Streaming or Capture**: WatchParty does **not** stream, capture, record, download, decrypt, or rehost video. It does not touch DRM-protected content or bypass player paywalls.
+> 
+> **Separate Accounts Required**: Every user must have their own official streaming account (e.g., YouTube Premium, Netflix subscription) and navigate to the same video/title independently. WatchParty only synchronizes the browser playback controls.
 
-- Creates short random room codes.
-- Lets another user join the same room code.
-- Tracks online users in Firebase Realtime Database.
-- Syncs HTML5 player play, pause, seek, and current time.
-- Corrects playback drift only when users are more than 1.5 seconds apart.
-- Provides room chat in the popup and floating page overlay.
-- Supports a two-person audio/video call with WebRTC and the public STUN server `stun:stun.l.google.com:19302`.
-- Uses Firebase Anonymous Authentication and Firebase Realtime Database.
+---
 
-## What WatchParty Does Not Do
+## Supported Sites & Limitations
 
-- It does not download, capture, stream, rehost, decrypt, or bypass DRM-protected video.
-- It does not access video files directly.
-- It does not replace a streaming subscription.
-- It does not share paid content between accounts.
-- It does not guarantee control on every streaming platform, because official players and DRM-protected sites vary.
+### Fully Supported & Controllable
+*   **YouTube**: Fully implemented playback synchronization, chat, and WebRTC calls.
+*   **Generic HTML5 Video**: Any webpage running a standard HTML5 `<video>` tag.
 
-Every user must watch from their own official streaming account. WatchParty only coordinates player state between browsers.
+### Passive Detection / Best-Effort Only
+*   **Netflix, Disney+, Prime Video, Hulu, Max (HBO), Paramount+**
+    *   **Limitation**: WatchParty uses best-effort, safe detection of page-level HTML5 media. If a platform dynamically obfuscates, locks, or blocks programmatic playback API controls (play, pause, seek), the extension will display a clear "waiting/unsupported" state rather than attempting to bypass these player protections.
 
-## Supported Sites
+---
 
-Fully implemented safe support:
+## Firebase Setup Guide
 
-- YouTube
-- Generic HTML5 video pages
+WatchParty uses Firebase for user authentication, room state sync, chat, and WebRTC signaling. The extension contains a preconfigured Firebase configuration, but you must enable the services in your console:
 
-Best-effort safe HTML5 detection only:
+1.  **Create a Firebase Project**:
+    *   Go to the [Firebase Console](https://console.firebase.google.com/) and click **Add Project**. Name it `WatchParty`.
+2.  **Enable Anonymous Authentication**:
+    *   In the Firebase sidebar, go to **Build** > **Authentication** > **Sign-in method**.
+    *   Click **Add new provider**, select **Anonymous**, enable it, and click **Save**.
+3.  **Enable Realtime Database**:
+    *   In the sidebar, go to **Build** > **Realtime Database** and click **Create Database**.
+    *   Choose a database location (the default configuration uses `us-central1` or your default `firebaseio.com` URL).
+    *   Start in **test mode** or edit the database rules directly.
+4.  **Publish Security Rules**:
+    *   Select the **Rules** tab in your Realtime Database.
+    *   Paste the security rules found in [FIREBASE_RULES.md](docs/FIREBASE_RULES.md) to ensure room state, WebRTC coordinates, and chat messages are protected.
 
-- Netflix
-- Disney+
-- Prime Video / Amazon
-- Hulu
-- Max / HBO Max
-- Paramount+
+*Note: The Firebase web API key is safe to be exposed in the frontend code. Security is enforced by Authentication and Realtime Database rules.*
 
-If a platform does not expose a controllable HTML5 video element, WatchParty shows a clear waiting/unsupported status rather than trying to bypass the player.
+---
+
+## Installation (Chrome, Edge, Brave, Opera)
+
+1.  Download or clone this repository to your local machine.
+2.  Open your browser's extension management page:
+    *   **Chrome**: Open a new tab and go to `chrome://extensions`.
+    *   **Edge**: Open a new tab and go to `edge://extensions`.
+3.  Toggle the **Developer Mode** switch at the top right to **On**.
+4.  Click the **Load unpacked** button at the top left.
+5.  Select the `extension/` folder inside this project directory.
+6.  (Optional) Click the puzzle icon in your browser toolbar and pin **WatchParty** for quick access.
+
+---
+
+## Testing Playback Sync & WebRTC
+
+To test the extension locally:
+
+1.  **Open Two Chrome Profiles**: Load the unpacked extension under two separate browser profiles or use two different Chromium browsers.
+2.  **Open YouTube**: Navigate to the exact same YouTube video in both profiles.
+3.  **Create Room (Profile A)**: Open the WatchParty popup, type a display name, and click **Create room**.
+4.  **Join Room (Profile B)**: Open the WatchParty popup, type a display name, enter the room code from Profile A, and click **Join**.
+5.  **Test Playback Sync**: Pause, play, or drag the seek bar on Profile A. Verify that Profile B mirrors the action.
+6.  **Test Call (WebRTC)**: Click **Start call** in both popups or overlays, allow camera/microphone permissions when prompted, and verify that peer-to-peer audio and video display correctly.
+
+For a detailed step-by-step testing plan, see [TESTING.md](docs/TESTING.md).
+
+---
 
 ## Project Structure
 
-```text
-extension/
-  manifest.json
-  popup.html
-  popup.css
-  popup.js
-  content.js
-  firebase.js
-  sync.js
-  chat.js
-  webrtc.js
-  ui.js
-  adapters/
-  assets/
-website/
-docs/
-```
+*   [extension/](file:///C:/Users/agraj/.gemini/antigravity/scratch/watchparty/extension): Contains the manifest, background/content scripts, popup UI, and WebRTC managers.
+*   [website/](file:///C:/Users/agraj/.gemini/antigravity/scratch/watchparty/website): Landing page codebase introducing the utility.
+*   [docs/](file:///C:/Users/agraj/.gemini/antigravity/scratch/watchparty/docs):
+    *   [FIREBASE_RULES.md](docs/FIREBASE_RULES.md): Database authorization rules.
+    *   [LIMITATIONS.md](docs/LIMITATIONS.md): Detailed limitations and DRM boundaries.
+    *   [PRIVACY.md](docs/PRIVACY.md): Data retention and sharing boundaries.
+    *   [TESTING.md](docs/TESTING.md): Chrome profile and media testing checklists.
 
-## Firebase Setup
+---
 
-The extension is preconfigured for the `watchparty-8c5f9` Firebase project and Realtime Database URL:
+## Privacy & Security
 
-```text
-https://watchparty-8c5f9-default-rtdb.asia-southeast1.firebasedatabase.app
-```
-
-Manual setup still required:
-
-1. Enable Anonymous Authentication in Firebase Authentication.
-2. Enable Realtime Database.
-3. Publish safe database rules. Start with the example in [docs/FIREBASE_RULES.md](docs/FIREBASE_RULES.md).
-4. Add authorized domains if Firebase asks for them during browser extension testing.
-
-The Firebase web API key is included in frontend code because Firebase web apps normally expose it. Security must come from Authentication and Realtime Database rules, not from hiding this key.
-
-## Load In Chrome, Edge, Brave, Or Opera
-
-1. Open your browser extensions page.
-2. Enable Developer Mode.
-3. Choose Load unpacked.
-4. Select the `extension/` folder from this repository.
-5. Pin WatchParty if you want easy popup access.
-
-## Quick YouTube Test
-
-1. Load the unpacked extension in two Chrome profiles.
-2. Open the same YouTube video in both profiles.
-3. In profile A, click WatchParty, enter a display name, and create a room.
-4. In profile B, enter a display name and join using the room code.
-5. Pause, play, and seek in either profile.
-6. Confirm the other profile follows the state change.
-7. Send chat messages from both profiles.
-8. Click Start call in both profiles and allow camera/mic permissions.
-
-More detail is in [docs/TESTING.md](docs/TESTING.md).
-
-## Privacy
-
-WatchParty stores room presence, playback state, chat messages, and WebRTC signaling metadata in Firebase Realtime Database. It does not store video streams. WebRTC media flows peer-to-peer when possible. See [docs/PRIVACY.md](docs/PRIVACY.md).
-
-## Known Limitations
-
-See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for platform limitations, WebRTC constraints, future TURN server support, and future Firefox support.
-
-## Repository
-
-https://github.com/agraja38/WatchParty
+WatchParty store rooms, active users, chat strings, and WebRTC candidate handshakes in the Firebase Realtime Database. Realtime data can be trimmed or configured to expire. Media streams flow directly peer-to-peer via WebRTC. See [PRIVACY.md](docs/PRIVACY.md) for more details.

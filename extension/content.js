@@ -21,6 +21,7 @@
       await joinRoom(stored[firebase.ROOM_KEY], displayName);
     } else {
       ui.setRoomStatus("No room joined");
+      ui.setVisible(false);
     }
     watchNavigation();
     window.addEventListener("beforeunload", () => {
@@ -37,6 +38,7 @@
       onToggleMute: () => webrtc?.toggleMute(),
       onToggleCamera: () => webrtc?.toggleCamera()
     });
+    ui.setVisible(Boolean(roomId));
   }
 
   function selectAdapter() {
@@ -60,6 +62,7 @@
     await firebase.ensureRoom(roomId, displayName);
     ensureUi();
     ui.setRoomStatus(`Room ${roomId} as ${displayName}`);
+    ui.setVisible(true);
     startChat();
     startSyncWhenReady();
   }
@@ -123,6 +126,7 @@
     ui.setRoomStatus("No room joined");
     ui.setSyncStatus("idle");
     ui.setMessages([]);
+    ui.setVisible(false);
     roomId = null;
   }
 
@@ -149,7 +153,10 @@
           roomId,
           platform: adapter?.name || "Unsupported",
           canControl: Boolean(adapter?.canControl()),
-          displayName
+          displayName,
+          callActive: Boolean(webrtc && webrtc.pc),
+          micMuted: webrtc ? webrtc.micMuted : false,
+          cameraOff: webrtc ? webrtc.cameraOff : false
         });
         return;
       }
