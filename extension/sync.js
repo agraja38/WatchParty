@@ -22,7 +22,7 @@
         return false;
       }
 
-      [["play", "playing"], ["pause", "paused"], ["seeked", "seeked"]].forEach(([eventName, status]) => {
+      [["play", "playing"], ["playing", "playing"], ["pause", "paused"], ["seeked", "seeked"]].forEach(([eventName, status]) => {
         const handler = () => this.publish(status);
         video.addEventListener(eventName, handler, true);
         this.boundHandlers.push([video, eventName, handler]);

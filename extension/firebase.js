@@ -54,10 +54,38 @@
     return code;
   }
 
+  async function refreshIdToken(cached) {
+    const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${CONFIG.apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(cached.refreshToken)}`
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Firebase token refresh failed: ${text}`);
+    }
+    const data = await response.json();
+    const authUser = {
+      idToken: data.id_token,
+      refreshToken: data.refresh_token || cached.refreshToken,
+      localId: data.user_id || cached.localId,
+      expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000
+    };
+    await storage.set({ [AUTH_KEY]: authUser });
+    return authUser;
+  }
+
   async function signInAnonymously() {
     const cached = (await storage.get(AUTH_KEY))[AUTH_KEY];
     if (cached?.idToken && cached?.localId && cached?.expiresAt > Date.now() + 60000) {
       return cached;
+    }
+    if (cached?.refreshToken) {
+      try {
+        return await refreshIdToken(cached);
+      } catch (_) {
+        // Fall through to a new anonymous sign-up if refresh fails.
+      }
     }
 
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${CONFIG.apiKey}`, {
@@ -130,6 +158,15 @@
     const user = await signInAnonymously();
     const url = `${CONFIG.databaseURL}/${encodePath(path)}.json?auth=${encodeURIComponent(user.idToken)}`;
     let cache = undefined;
+    try {
+      const initial = await fetch(url, { headers: { Accept: "application/json" } });
+      if (initial.ok) {
+        cache = await initial.json();
+        if (cache !== null) callback(cache);
+      }
+    } catch (error) {
+      onError?.(error);
+    }
     const source = new EventSource(url);
 
     source.addEventListener("put", (event) => {

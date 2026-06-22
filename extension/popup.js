@@ -71,7 +71,11 @@
     await firebase.ensureRoom(roomId, getDisplayName());
     updateRoomUi();
     startChat();
-    await sendToActiveTab({ type: "WATCHPARTY_JOIN_ROOM", roomId, displayName: getDisplayName() });
+    const tabResult = await sendToActiveTab({ type: "WATCHPARTY_JOIN_ROOM", roomId, displayName: getDisplayName() });
+    if (tabResult === null) {
+      setStatus("Room ready. Open a supported streaming tab to sync playback.");
+      return;
+    }
     setStatus("Connected");
   }
 

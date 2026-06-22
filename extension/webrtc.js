@@ -18,6 +18,11 @@
     }
 
     async start() {
+      if (this.pc || this.localStream) {
+        this.ui?.setCallStatus("Call already active.");
+        return;
+      }
+
       const users = await this.firebase.get(`rooms/${this.roomId}/users`);
       const onlineUsers = Object.entries(users || {}).filter(([, user]) => user.online);
       if (onlineUsers.length > 2) {
