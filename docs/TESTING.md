@@ -19,9 +19,21 @@ Use this checklist before any release. All steps use YouTube as the primary test
 
 1. Open Firefox and go to `about:debugging#/runtime/this-firefox`.
 2. Click **Load Temporary Add-on** and choose `extension/manifest.json`.
-3. Pin WatchParty and open the popup from the toolbar.
-4. Verify popup width is full and readable (not a thin vertical strip).
-5. Verify all sections are visible: Display Name, Create/Join Room, Chat, and Call controls.
+3. Open a YouTube video tab first (for example `https://www.youtube.com/watch?v=...`).
+4. Pin WatchParty and open the popup from the toolbar.
+5. Verify popup width is full and readable (not a thin vertical strip).
+6. Verify all sections are visible: Display Name, Create/Join Room, Chat, and Call controls.
+7. Verify status messages:
+   - `Firebase: Connected` appears in the top badge.
+   - `Room: Not in room` appears until you create/join.
+   - Page status shows either YouTube readiness or `Open YouTube or a supported streaming site.`
+8. In `about:debugging`, click **Inspect** for the extension and check popup console logs:
+   - `Firebase app initialized`
+   - `Anonymous auth success with uid`
+   - `Room create attempted` / `Room create success` (after creating room)
+9. Open YouTube page DevTools console and verify `WatchParty content script loaded` appears.
+10. Click **Create room** and confirm room status changes to `Room: In room`.
+11. In a second Firefox profile, load the same temporary add-on and join using the room code.
 
 ---
 
@@ -185,3 +197,5 @@ Use this checklist before any release. All steps use YouTube as the primary test
 - If WebRTC connects on one network but not another, a TURN server may be required in the future.
 - If Firebase writes fail, confirm Anonymous Authentication, Realtime Database, and security rules are configured.
 - If Firefox popup is narrow, remove and re-load the temporary add-on from `about:debugging` so updated popup CSS is applied.
+- If popup shows `Firebase: Error`, inspect the extension console for `Anonymous auth error` and verify `identitytoolkit.googleapis.com`, `securetoken.googleapis.com`, and Realtime Database hosts are reachable.
+- If popup cannot detect a YouTube tab, refresh the YouTube page after loading the temporary add-on so content scripts inject.

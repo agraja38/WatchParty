@@ -23,6 +23,8 @@
     "activeTab"
   ],
   "host_permissions": [
+    "*://youtube.com/*",
+    "*://*.youtube.com/*",
     "https://www.youtube.com/*",
     "https://youtube.com/*",
     "https://*.youtube.com/*",
@@ -50,6 +52,8 @@
   "content_scripts": [
     {
       "matches": [
+        "*://youtube.com/*",
+        "*://*.youtube.com/*",
         "https://www.youtube.com/*",
         "https://youtube.com/*",
         "https://*.youtube.com/*",

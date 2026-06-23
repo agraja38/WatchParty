@@ -1,4 +1,5 @@
 (() => {
+  const ext = globalThis.browser || globalThis.chrome;
   const firebase = window.WatchPartyFirebase;
   let authUser = null;
   let roomId = null;
@@ -12,6 +13,7 @@
   let lastHref = location.href;
 
   async function boot() {
+    console.log("WatchParty content script loaded");
     authUser = await firebase.signInAnonymously();
     const stored = await firebase.storage.get([firebase.ROOM_KEY, firebase.DISPLAY_NAME_KEY]);
     displayName = stored[firebase.DISPLAY_NAME_KEY] || "Guest";
@@ -142,7 +144,7 @@
     }, 1000);
   }
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  ext.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     (async () => {
       if (message?.type === "WATCHPARTY_JOIN_ROOM") await joinRoom(message.roomId, message.displayName);
       if (message?.type === "WATCHPARTY_LEAVE_ROOM") await leaveRoom();

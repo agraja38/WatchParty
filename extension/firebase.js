@@ -1,4 +1,5 @@
 (() => {
+  const ext = globalThis.browser || globalThis.chrome;
   const CONFIG = {
     apiKey: "AIzaSyBJjaiKbiNcvcf6yH9_VcWhq_NKkYis8dQ",
     authDomain: "watchparty-8c5f9.firebaseapp.com",
@@ -16,18 +17,20 @@
 
   const storage = {
     async get(keys) {
-      if (!globalThis.chrome?.storage?.local) return {};
-      return chrome.storage.local.get(keys);
+      if (!ext?.storage?.local) return {};
+      return ext.storage.local.get(keys);
     },
     async set(value) {
-      if (!globalThis.chrome?.storage?.local) return;
-      await chrome.storage.local.set(value);
+      if (!ext?.storage?.local) return;
+      await ext.storage.local.set(value);
     },
     async remove(keys) {
-      if (!globalThis.chrome?.storage?.local) return;
-      await chrome.storage.local.remove(keys);
+      if (!ext?.storage?.local) return;
+      await ext.storage.local.remove(keys);
     }
   };
+
+  console.log("Firebase app initialized", { projectId: CONFIG.projectId, databaseURL: CONFIG.databaseURL });
 
   function cleanPath(path) {
     return String(path || "").replace(/^\/+|\/+$/g, "");
@@ -78,11 +81,14 @@
   async function signInAnonymously() {
     const cached = (await storage.get(AUTH_KEY))[AUTH_KEY];
     if (cached?.idToken && cached?.localId && cached?.expiresAt > Date.now() + 60000) {
+      console.log("Anonymous auth success with uid", cached.localId);
       return cached;
     }
     if (cached?.refreshToken) {
       try {
-        return await refreshIdToken(cached);
+        const refreshed = await refreshIdToken(cached);
+        console.log("Anonymous auth success with uid", refreshed.localId);
+        return refreshed;
       } catch (_) {
         // Fall through to a new anonymous sign-up if refresh fails.
       }
@@ -96,6 +102,7 @@
 
     if (!response.ok) {
       const text = await response.text();
+      console.error("Anonymous auth error", text);
       throw new Error(`Firebase anonymous auth failed: ${text}`);
     }
 
@@ -107,6 +114,7 @@
       expiresAt: Date.now() + Number(data.expiresIn || 3600) * 1000
     };
     await storage.set({ [AUTH_KEY]: authUser });
+    console.log("Anonymous auth success with uid", authUser.localId);
     return authUser;
   }
 
@@ -123,6 +131,7 @@
 
   async function request(path, options = {}, query = "") {
     const url = await dbUrl(path, query);
+    console.debug("Database connected/ref ready", path);
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -216,17 +225,24 @@
   }
 
   async function ensureRoom(roomId, displayName) {
-    const user = await setUserPresence(roomId, displayName, true);
-    await request(`rooms/${roomId}/meta`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        schemaVersion: 1
-      })
-    });
-    await storage.set({ [ROOM_KEY]: roomId, [DISPLAY_NAME_KEY]: displayName || "Guest" });
-    return { roomId, userId: user.localId };
+    console.log("Room create attempted", { roomId, displayName: displayName || "Guest" });
+    try {
+      const user = await setUserPresence(roomId, displayName, true);
+      await request(`rooms/${roomId}/meta`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          schemaVersion: 1
+        })
+      });
+      await storage.set({ [ROOM_KEY]: roomId, [DISPLAY_NAME_KEY]: displayName || "Guest" });
+      console.log("Room create success", { roomId, userId: user.localId });
+      return { roomId, userId: user.localId };
+    } catch (error) {
+      console.error("Room create error", error);
+      throw error;
+    }
   }
 
   async function leaveRoom(roomId, displayName) {

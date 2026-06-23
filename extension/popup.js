@@ -1,8 +1,23 @@
 (() => {
+  const ext = globalThis.browser || globalThis.chrome;
   const firebase = window.WatchPartyFirebase;
   let authUser = null;
   let roomId = null;
   let chat = null;
+  let firebaseState = { status: "connecting", message: "Firebase: Connecting..." };
+
+  const SUPPORTED_HOSTS = [
+    "youtube.com",
+    "youtu.be",
+    "netflix.com",
+    "disneyplus.com",
+    "primevideo.com",
+    "amazon.com",
+    "hulu.com",
+    "max.com",
+    "hbomax.com",
+    "paramountplus.com"
+  ];
 
   const els = {
     displayName: document.getElementById("displayName"),
@@ -24,14 +39,23 @@
   };
 
   async function init() {
-    authUser = await firebase.signInAnonymously();
-    const stored = await firebase.storage.get([firebase.ROOM_KEY, firebase.DISPLAY_NAME_KEY]);
-    roomId = stored[firebase.ROOM_KEY] || null;
-    els.displayName.value = stored[firebase.DISPLAY_NAME_KEY] || `Guest-${authUser.localId.slice(0, 4)}`;
-    updateRoomUi();
-    if (roomId) startChat();
-    bindEvents();
-    refreshTabStatus();
+    try {
+      setFirebaseState("connecting", "Firebase: Connecting...");
+      authUser = await firebase.signInAnonymously();
+      setFirebaseState("connected", "Firebase: Connected");
+      const stored = await firebase.storage.get([firebase.ROOM_KEY, firebase.DISPLAY_NAME_KEY]);
+      roomId = stored[firebase.ROOM_KEY] || null;
+      els.displayName.value = stored[firebase.DISPLAY_NAME_KEY] || `Guest-${authUser.localId.slice(0, 4)}`;
+      updateRoomUi();
+      if (roomId) startChat();
+      bindEvents();
+      await refreshTabStatus();
+    } catch (error) {
+      console.error("WatchParty popup init failed", error);
+      setFirebaseState("error", "Firebase: Error");
+      els.platformStatus.textContent = "Open YouTube or a supported streaming site.";
+      els.callStatus.textContent = "Fix Firebase/auth setup, then reopen popup.";
+    }
   }
 
   function bindEvents() {
@@ -69,26 +93,36 @@
   }
 
   async function createRoom() {
-    await enterRoom(firebase.createRoomCode());
+    try {
+      await enterRoom(firebase.createRoomCode());
+    } catch (error) {
+      handleActionError("Room create failed.", error);
+    }
   }
 
   async function joinRoom() {
     const code = els.joinCode.value.trim().toUpperCase();
     if (!code) return setStatus("Enter a room code first.");
-    await enterRoom(code);
+    try {
+      await enterRoom(code);
+    } catch (error) {
+      handleActionError("Room join failed.", error);
+    }
   }
 
   async function enterRoom(code) {
+    console.log("Room create attempted", { roomId: code, displayName: getDisplayName() });
     roomId = code;
     await firebase.ensureRoom(roomId, getDisplayName());
+    console.log("Room create success", { roomId });
     updateRoomUi();
     startChat();
     const tabResult = await sendToActiveTab({ type: "WATCHPARTY_JOIN_ROOM", roomId, displayName: getDisplayName() });
     if (tabResult === null) {
-      setStatus("Room ready. Open a supported streaming tab to sync playback.");
+      setStatus("Room ready. Open YouTube or a supported streaming site.");
       return;
     }
-    setStatus("Connected");
+    setStatus("Room connected.");
   }
 
   async function leaveRoom() {
@@ -100,7 +134,7 @@
     roomId = null;
     renderMessages([]);
     updateRoomUi();
-    setStatus("Disconnected");
+    setStatus("Left room.");
   }
 
   function startChat() {
@@ -135,25 +169,53 @@
   }
 
   async function refreshTabStatus() {
+    const activeTab = await getActiveTab();
+    const pageSupported = isSupportedTab(activeTab);
     const response = await sendToActiveTab({ type: "WATCHPARTY_STATUS" });
     if (response?.platform) {
       els.platformStatus.textContent = `${response.platform}: ${response.canControl ? "ready to sync" : "waiting for video"}`;
       els.callStatus.textContent = roomId ? "Call controls target this tab." : "Join a room before starting a call.";
       updateCallUi(response.callActive, response.micMuted, response.cameraOff);
+    } else if (pageSupported) {
+      els.platformStatus.textContent = "Supported page found. Refresh the page if controls are unavailable.";
+      els.callStatus.textContent = "Open the video tab and start playback once to initialize controls.";
+      updateCallUi(false, false, false);
     } else {
-      els.platformStatus.textContent = "Open a supported streaming tab to sync playback.";
+      els.platformStatus.textContent = "Open YouTube or a supported streaming site.";
       updateCallUi(false, false, false);
     }
   }
 
+  async function getActiveTab() {
+    if (!ext?.tabs?.query) return null;
+    try {
+      const result = await ext.tabs.query({ active: true, currentWindow: true });
+      return Array.isArray(result) ? result[0] : null;
+    } catch (error) {
+      console.error("Active tab query failed", error);
+      return null;
+    }
+  }
+
   async function sendToActiveTab(message) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
     if (!tab?.id) return null;
     try {
-      return await chrome.tabs.sendMessage(tab.id, message);
-    } catch {
+      return await ext.tabs.sendMessage(tab.id, message);
+    } catch (error) {
+      console.debug("WatchParty tab messaging unavailable", { tabId: tab.id, type: message?.type, error: error?.message });
       // Content script not loaded on this tab — return null to let caller handle it.
       return null;
+    }
+  }
+
+  function isSupportedTab(tab) {
+    if (!tab?.url) return false;
+    try {
+      const host = new URL(tab.url).hostname.toLowerCase();
+      return SUPPORTED_HOSTS.some((domain) => host === domain || host.endsWith(`.${domain}`));
+    } catch {
+      return false;
     }
   }
 
@@ -164,7 +226,7 @@
   function updateRoomUi() {
     els.currentRoom.textContent = roomId || "None";
     els.leaveRoom.disabled = !roomId;
-    setStatus(roomId ? "Connected" : "Disconnected");
+    setStatus(roomId ? "Room: In room" : "Room: Not in room");
     
     if (roomId) {
       document.body.classList.remove("wp-no-room");
@@ -189,7 +251,29 @@
   }
 
   function setStatus(text) {
-    els.connectionStatus.textContent = text;
+    if (firebaseState.status === "error") {
+      els.connectionStatus.textContent = "Firebase: Error";
+      return;
+    }
+    els.connectionStatus.textContent = text.startsWith("Firebase:")
+      ? text
+      : `${firebaseState.message} | ${text}`;
+  }
+
+  function setFirebaseState(status, message) {
+    firebaseState = { status, message };
+    setStatus(roomId ? "Room: In room" : "Room: Not in room");
+  }
+
+  function handleActionError(prefix, error) {
+    console.error(prefix, error);
+    const firebaseError = /Firebase|auth|database/i.test(error?.message || "");
+    if (firebaseError) {
+      setFirebaseState("error", "Firebase: Error");
+      setStatus("Firebase unavailable. Check auth/database setup.");
+    } else {
+      setStatus(`${prefix} ${error?.message || "Try again."}`);
+    }
   }
 
   function escapeHtml(value) {
@@ -202,5 +286,5 @@
     }[char]));
   }
 
-  init().catch((error) => setStatus(error.message));
+  init();
 })();
