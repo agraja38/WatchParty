@@ -66,16 +66,17 @@
 
   function parseDatabaseError(text, source, path) {
     const parsed = parseJsonSafe(text);
-    const message = parsed?.error || parsed?.error?.message || text || "Database request failed";
+    const message = parsed?.error?.message || parsed?.error || text || "Database request failed";
+    const messageText = typeof message === "string" ? message : JSON.stringify(message);
     let code = "database/unknown";
-    if (/permission denied/i.test(message)) code = "database/permission-denied";
+    if (/permission denied/i.test(messageText)) code = "database/permission-denied";
     if (/database lives in a different region|correctUrl/i.test(text)) code = "database/incorrect-url";
-    if (/auth/i.test(message) && /expired|invalid/i.test(message)) code = "database/auth-invalid";
+    if (/auth/i.test(messageText) && /expired|invalid/i.test(messageText)) code = "database/auth-invalid";
     return createFirebaseError({
       code,
       source,
       message: `Database error: ${code} (${path})`,
-      details: message,
+      details: messageText,
       correctUrl: parsed?.correctUrl
     });
   }
@@ -84,7 +85,7 @@
     return createFirebaseError({
       code: "firebase/network-or-csp",
       source,
-      message: "Firebase network/CSP error. Check extension console.",
+      message: "Network or CSP error. Check extension console.",
       details: error?.message || String(error)
     });
   }
@@ -226,38 +227,73 @@
     return `auth=${encodeURIComponent(user.idToken)}`;
   }
 
-  async function dbUrl(path, query = "", databaseURL = activeDatabaseURL) {
-    const auth = await authQuery();
+  function buildDbUrl(path, token, query = "", databaseURL = activeDatabaseURL) {
+    const auth = `auth=${encodeURIComponent(token)}`;
     const suffix = query ? `${auth}&${query}` : auth;
     return `${databaseURL}/${encodePath(path)}.json?${suffix}`;
   }
 
-  async function request(path, options = {}, query = "") {
-    const url = await dbUrl(path, query);
-    debugLog("Database connected/ref ready", path);
-    debugLog("Database URL being used", activeDatabaseURL);
-    let response;
-    try {
-      response = await fetch(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...(options.headers || {})
-        }
-      });
-    } catch (error) {
-      throw parseNetworkError(error, "realtime-database");
-    }
-    if (!response.ok) {
+  async function fetchDatabase(path, user, options = {}, query = "") {
+    const attempted = new Set();
+    const candidates = [activeDatabaseURL, ...DATABASE_URL_FALLBACKS].filter(Boolean);
+    let lastError = null;
+
+    while (candidates.length) {
+      const databaseURL = candidates.shift();
+      if (attempted.has(databaseURL)) continue;
+      attempted.add(databaseURL);
+      debugLog("Database URL being used", databaseURL);
+      let response;
+      try {
+        response = await fetch(buildDbUrl(path, user.idToken, query, databaseURL), {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+          }
+        });
+      } catch (error) {
+        lastError = parseNetworkError(error, "realtime-database");
+        continue;
+      }
+
+      if (response.ok) {
+        activeDatabaseURL = databaseURL;
+        return response;
+      }
+
       const text = await response.text();
       const parsedError = parseDatabaseError(text, "realtime-database", path);
-      if (parsedError.correctUrl && DATABASE_URL_FALLBACKS.includes(parsedError.correctUrl)) {
+      lastError = parsedError;
+      if (parsedError.correctUrl && !attempted.has(parsedError.correctUrl)) {
         activeDatabaseURL = parsedError.correctUrl;
-        debugLog("Database URL being used", activeDatabaseURL);
-        return request(path, options, query);
+        candidates.unshift(parsedError.correctUrl);
+        continue;
       }
       throw parsedError;
     }
+
+    throw lastError || createFirebaseError({
+      code: "database/unknown",
+      source: "realtime-database",
+      message: `Database error: database/unknown (${path})`,
+      details: "No database URL candidate succeeded"
+    });
+  }
+
+  async function request(path, options = {}, query = "") {
+    const user = await signInAnonymously();
+    debugLog("Database connected/ref ready", path);
+    const method = String(options.method || "GET").toUpperCase();
+    if (method !== "GET") debugLog("Firebase write path", path);
+    let response;
+    try {
+      response = await fetchDatabase(path, user, options, query);
+    } catch (error) {
+      if (method !== "GET") debugError("Firebase write failed code/message", path, error?.code, error?.message, error?.details);
+      throw error;
+    }
+    if (method !== "GET") debugLog("Firebase write success", path);
     if (response.status === 204) return null;
     return response.json();
   }
@@ -280,18 +316,18 @@
 
   async function onValue(path, callback, onError) {
     const user = await signInAnonymously();
-    const url = `${activeDatabaseURL}/${encodePath(path)}.json?auth=${encodeURIComponent(user.idToken)}`;
     let cache = undefined;
     let closed = false;
     try {
-      const initial = await fetch(url, { headers: { Accept: "application/json" } });
-      if (initial.ok) {
-        cache = await initial.json();
-        if (cache !== null) callback(cache);
-      }
+      const initial = await fetchDatabase(path, user, { method: "GET", headers: { Accept: "application/json" } });
+      cache = await initial.json();
+      if (cache !== null) callback(cache);
     } catch (error) {
+      debugError("Firebase listener error", error?.code, error?.message, error?.details);
       onError?.(error);
     }
+    const url = buildDbUrl(path, user.idToken);
+    debugLog("Firebase listener attached", path);
     const source = new EventSource(url);
 
     source.addEventListener("put", (event) => {
@@ -310,13 +346,27 @@
       callback(cache);
     });
     source.addEventListener("cancel", (event) => {
-      onError?.(new Error(`Firebase stream cancelled: ${event.data || "unknown"}`));
+      const error = createFirebaseError({
+        code: "database/listener-cancelled",
+        source: "realtime-database",
+        message: `Database error: database/listener-cancelled (${path})`,
+        details: event.data || "unknown"
+      });
+      debugError("Firebase listener error", error.code, error.message, error.details);
+      onError?.(error);
     });
     source.onerror = () => {
       // SSE errors are transient; the browser will auto-reconnect.
       // Only surface the error if the source is in a permanently closed state.
       if (source.readyState === EventSource.CLOSED && !closed) {
-        onError?.(new Error(`Firebase stream closed for ${path}`));
+        const error = createFirebaseError({
+          code: "database/listener-closed",
+          source: "realtime-database",
+          message: `Database error: database/listener-closed (${path})`,
+          details: "EventSource closed"
+        });
+        debugError("Firebase listener error", error.code, error.message, error.details);
+        onError?.(error);
       }
     };
 
@@ -345,21 +395,52 @@
     debugLog("Create room attempted", { roomId, displayName: displayName || "Guest" });
     try {
       const user = await setUserPresence(roomId, displayName, true);
-      debugLog("Create room write path", `rooms/${roomId}/meta`);
-      await request(`rooms/${roomId}/meta`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          schemaVersion: 1
-        })
-      });
+      await writeRoomMetadata(roomId);
+      const existingState = await request(`rooms/${roomId}/state`, { method: "GET" }).catch(() => null);
+      if (!existingState) {
+        debugLog("Create room write path", `rooms/${roomId}/state`);
+        await request(`rooms/${roomId}/state`, {
+          method: "PUT",
+          body: JSON.stringify({
+            status: "paused",
+            time: 0,
+            updatedAt: Date.now(),
+            updatedBy: user.localId,
+            actionId: createActionId("room"),
+            platform: "none",
+            titleOrVideoId: "not-started"
+          })
+        });
+      }
       await storage.set({ [ROOM_KEY]: roomId, [DISPLAY_NAME_KEY]: displayName || "Guest" });
       debugLog("Create room success", { roomId, userId: user.localId });
       return { roomId, userId: user.localId };
     } catch (error) {
       debugError("Create room failed with full Firebase error code and message", error?.code, error?.message, error?.details);
       throw error;
+    }
+  }
+
+  async function writeRoomMetadata(roomId) {
+    const metadata = {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      schemaVersion: 1
+    };
+    debugLog("Create room write path", `rooms/${roomId}/metadata`);
+    try {
+      await request(`rooms/${roomId}/metadata`, {
+        method: "PATCH",
+        body: JSON.stringify(metadata)
+      });
+    } catch (error) {
+      if (error?.code !== "database/permission-denied") throw error;
+      debugError("Firebase write failed code/message", `rooms/${roomId}/metadata`, error.code, error.message, error.details);
+      debugLog("Create room write path", `rooms/${roomId}/meta`);
+      await request(`rooms/${roomId}/meta`, {
+        method: "PATCH",
+        body: JSON.stringify(metadata)
+      });
     }
   }
 

@@ -53,7 +53,7 @@
       await refreshTabStatus();
     } catch (error) {
       console.error("WatchParty popup init failed", error);
-      setFirebaseState("error", mapFirebaseError(error) || "Firebase: Error");
+      setFirebaseState("error", mapFirebaseError(error) || "Firebase error: unknown");
       els.platformStatus.textContent = "Room setup does not require a streaming tab.";
       els.callStatus.textContent = "Fix Firebase/auth setup, then retry Create or Join.";
     }
@@ -107,6 +107,7 @@
     const code = els.joinCode.value.trim().toUpperCase();
     if (!code) return setStatus("Enter a room code first.");
     try {
+      if (DEBUG) console.log("Join room clicked", { roomId: code });
       await ensureAuth();
       await enterRoom(code);
     } catch (error) {
@@ -264,7 +265,7 @@
 
   function setStatus(text) {
     if (firebaseState.status === "error" && !text.startsWith("Firebase")) {
-      els.connectionStatus.textContent = firebaseState.message || "Firebase: Error";
+      els.connectionStatus.textContent = firebaseState.message || "Firebase error: unknown";
       return;
     }
     els.connectionStatus.textContent = text.startsWith("Firebase:")
@@ -302,7 +303,7 @@
       return "Firebase Auth error: auth/configuration-not-found";
     }
     if (code === "database/permission-denied" || merged.includes("permission_denied") || merged.includes("permission denied")) {
-      return "Firebase permission denied. Check Realtime Database rules.";
+      return "Permission denied. Check Realtime Database rules.";
     }
     if (code === "app/missing-database-url" || merged.includes("database url is missing")) {
       return "Realtime Database URL is missing or incorrect.";
@@ -311,7 +312,7 @@
       return "Realtime Database URL is missing or incorrect.";
     }
     if (code === "firebase/network-or-csp" || merged.includes("failed to fetch") || merged.includes("networkerror")) {
-      return "Firebase network/CSP error. Check extension console.";
+      return "Network or CSP error. Check extension console.";
     }
     if (code.startsWith("auth/")) {
       return `Firebase Auth error: ${code}`;
@@ -329,7 +330,7 @@
       return "Firebase connection blocked by Content Security Policy.";
     }
     if (merged.includes("firebase")) {
-      return "Firebase: Error";
+      return "Firebase error: unknown";
     }
     return null;
   }

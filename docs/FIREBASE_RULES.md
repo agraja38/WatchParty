@@ -1,22 +1,19 @@
 # Firebase Realtime Database Security Rules
 
-WatchParty relies on Firebase Anonymous Authentication to secure your database. You must configure rules to authorize read and write access for authenticated users while preventing abuse.
+WatchParty uses Firebase Anonymous Authentication to protect room data. Realtime Database rules must be published before rooms, chat, sync, or WebRTC signaling can work.
 
----
+## How To Apply Rules
 
-## How to Apply Rules
+1. Open the Firebase Console.
+2. Select the `watchparty-8c5f9` project.
+3. Go to Build > Realtime Database.
+4. Open the Rules tab.
+5. Paste either the minimal test rules or the recommended rules.
+6. Click Publish.
 
-1.  Open the [Firebase Console](https://console.firebase.google.com/).
-2.  Navigate to **Build** > **Realtime Database** from the sidebar.
-3.  Click the **Rules** tab at the top of the panel.
-4.  Paste the JSON rules block below into the editor.
-5.  Click **Publish** to apply the configuration.
+## Minimal Test Rules
 
----
-
-## Recommended Rules
-
-These rules require all readers and writers to be authenticated via Firebase Anonymous Authentication, restrict writing of user profiles to the owner of that user ID, validate that message structures match schema boundaries, and limit room chat messages to 500 characters.
+Use these rules while debugging Firefox/Chrome connectivity. They are intentionally broad for authenticated users so you can confirm Anonymous Auth and database wiring first.
 
 ```json
 {
@@ -24,6 +21,33 @@ These rules require all readers and writers to be authenticated via Firebase Ano
     "rooms": {
       "$roomId": {
         ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}
+```
+
+Important setup checks:
+
+- Anonymous Authentication must be enabled.
+- Realtime Database must be created, not only Firestore.
+- Rules must be published after editing.
+- If the popup shows `permission_denied` or `database/permission-denied`, rules are wrong or anonymous auth failed.
+
+## Recommended Rules
+
+Use these after basic room creation and cross-browser chat are working.
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        "metadata": {
+          ".write": "auth != null"
+        },
         "meta": {
           ".write": "auth != null"
         },
@@ -51,49 +75,18 @@ These rules require all readers and writers to be authenticated via Firebase Ano
 }
 ```
 
----
-
-## Minimal Test Rules (Use For Debugging)
-
-If room creation fails with `permission_denied`, temporarily use these rules to verify auth/write wiring:
-
-```json
-{
-  "rules": {
-    "rooms": {
-      "$roomId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
-      }
-    }
-  }
-}
-```
-
-Important:
-
-- Anonymous Authentication must be enabled in Firebase Console.
-- Realtime Database must be created (not Firestore only).
-- Rules must be published after editing.
-- If popup status shows `permission_denied` or `database/permission-denied`, rules are wrong or anonymous auth failed.
-
----
-
 ## Database Schema Reference
 
-For debugging or customized rule development, WatchParty structures database paths as follows:
+- `rooms/{roomId}/metadata`: Room creation and schema metadata.
+- `rooms/{roomId}/meta`: Legacy fallback used only if existing rules deny `metadata`.
+- `rooms/{roomId}/state`: Playback status, current time, platform, title/video identity, and action ID.
+- `rooms/{roomId}/users/{userId}`: Display name, joined time, and online presence.
+- `rooms/{roomId}/chat/{messageId}`: Room chat messages.
+- `rooms/{roomId}/webrtc`: WebRTC offers, answers, and ICE candidates.
 
-*   **`rooms/{roomId}/meta`**: Room creation and schema details.
-*   **`rooms/{roomId}/state`**: Active playback state coordinates (paused, playing, current time, active adapter name, video title).
-*   **`rooms/{roomId}/users/{userId}`**: Display name, online presence, and time joined.
-*   **`rooms/{roomId}/chat/{messageId}`**: Temporary room text messages.
-*   **`rooms/{roomId}/webrtc`**: Peer connection signal offers, answers, and ICE candidate paths.
+## Production Hardening Ideas
 
----
-
-## Production Security Recommendations
-
-For public deployments, consider these extra precautions:
-*   **App Check**: Integrate Firebase App Check to prevent unauthorized apps (non-extension browsers) from calling your database.
-*   **Room Expiry**: Write a cloud function or cron task to sweep and delete database directories of inactive rooms older than 24 hours.
-*   **WebRTC Validation**: Require users writing to `webrtc` paths to be registered members of the room under `rooms/{roomId}/users/{auth.uid}`.
+- Add room membership checks so only users under `rooms/{roomId}/users/{auth.uid}` can write room data.
+- Add room expiry cleanup for stale rooms.
+- Add stricter validation for WebRTC signaling payloads.
+- Consider Firebase App Check before public release.
