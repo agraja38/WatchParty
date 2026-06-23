@@ -15,6 +15,16 @@ Use this checklist before any release. All steps use YouTube as the primary test
 
 ---
 
+## Firefox Popup Check (Temporary Add-on)
+
+1. Open Firefox and go to `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on** and choose `extension/manifest.json`.
+3. Pin WatchParty and open the popup from the toolbar.
+4. Verify popup width is full and readable (not a thin vertical strip).
+5. Verify all sections are visible: Display Name, Create/Join Room, Chat, and Call controls.
+
+---
+
 ## Step 1 — Load Unpacked Extension
 
 1. Open Chrome and navigate to `chrome://extensions`.
@@ -165,3 +175,13 @@ Use this checklist before any release. All steps use YouTube as the primary test
 2. Enable **Anonymous Authentication** under Build → Authentication → Sign-in method.
 3. Enable **Realtime Database** under Build → Realtime Database.
 4. Paste the rules from `docs/FIREBASE_RULES.md` into the Realtime Database Rules tab and click **Publish**.
+
+---
+
+## Common Troubleshooting
+
+- If popup says to open a supported streaming tab, click the tab with YouTube or another supported site and reopen the popup.
+- If sync waits for video, start playback once so the site creates its HTML5 video element.
+- If WebRTC connects on one network but not another, a TURN server may be required in the future.
+- If Firebase writes fail, confirm Anonymous Authentication, Realtime Database, and security rules are configured.
+- If Firefox popup is narrow, remove and re-load the temporary add-on from `about:debugging` so updated popup CSS is applied.
