@@ -1,75 +1,167 @@
-# Testing WatchParty
+# Testing WatchParty — Final Manual Checklist
 
-Follow this guide to verify synchronization, chat features, and audio/video calls using a local developer environment.
-
----
-
-## 1. Load the Extension Unpacked
-
-1.  Open a Chromium-based browser (Chrome, Edge, Brave, or Opera).
-2.  Navigate to the extensions settings page:
-    *   **Chrome**: `chrome://extensions`
-    *   **Edge**: `edge://extensions`
-3.  Enable **Developer Mode** in the settings panel.
-4.  Click **Load unpacked** and select the `extension/` directory of this project.
+Use this checklist before any release. All steps use YouTube as the primary test target because it is the most reliably controllable platform.
 
 ---
 
-## 2. Test with Two Chrome Profiles
+## Prerequisites
 
-Using two separate browser profiles is the easiest way to simulate two distinct users on the same machine:
-
-1.  Click your profile icon in the top right of Chrome and click **Add** to create a second, clean Chrome profile (or open an existing secondary profile).
-2.  Load the unpacked WatchParty extension into this second profile as well.
-3.  Arrange the two browser windows side-by-side on your desktop.
-
----
-
-## 3. YouTube Testing (Start Here)
-
-YouTube is the primary supported test platform. Start here to verify basic sync operations:
-
-1.  Open the **same YouTube video URL** in both Profile A and Profile B.
-2.  On Profile A, open the WatchParty extension popup. Type a display name (e.g., "Alice") and click **Create room**.
-3.  Locate the generated room code in the popup. Click the code box to copy it.
-4.  On Profile B, open the WatchParty popup. Type a display name (e.g., "Bob"), paste the code in the **Join room** box, and click **Join**.
-5.  **Verify Status**: Both Profile A and Profile B popups and floating page overlays should display the shared room ID. The overlay should report: `Platform: YouTube` and `Sync: idle`.
-
-### Playback Sync Checklist
-*   [ ] **Pause**: Pause the video in Profile A. Profile B's player must pause within a split second.
-*   [ ] **Play**: Resume the video in Profile A. Profile B's player must resume from the exact same timestamp.
-*   [ ] **Seek**: Click any point along the YouTube progress timeline in Profile A. Profile B's player must jump to that timeline point.
-*   [ ] **Drift Correction**: Let both profiles play. The adapter allows up to 1.5 seconds of drift before forcing a corrective seek.
-*   [ ] **Bidirectional Sync**: Repeat the pause, play, and seek actions from Profile B. Verify Profile A follows them.
-
-### Chat Checklist
-*   [ ] **Popup Chat**: Type a message in Profile A's popup chat and click **Send**. Verify it appears in Profile B's popup and on-page overlay.
-*   [ ] **Overlay Chat**: Type a message in Profile B's on-page overlay input. Press Enter and verify Profile A receives it.
+- Google Chrome (or Edge/Brave) installed.
+- This repository cloned locally.
+- Firebase project configured with:
+  - Anonymous Authentication enabled.
+  - Realtime Database enabled.
+  - Security rules from `FIREBASE_RULES.md` applied.
 
 ---
 
-## 4. WebRTC Camera/Microphone Testing
+## Step 1 — Load Unpacked Extension
 
-Verify WebRTC audio and video signaling and peer-to-peer media streams:
-
-1.  Ensure both Profile A and Profile B are in the same room.
-2.  Click **Start call** in the Profile A popup or overlay.
-3.  Click **Start call** in the Profile B popup or overlay.
-4.  **Grant Permissions**: When prompted by your browser, click **Allow** to grant camera and microphone access to both tabs.
-5.  **Verify Streams**:
-    *   [ ] The floating overlays will automatically display video elements (hiding the empty placeholders).
-    *   [ ] Profile A should display their local camera stream and Profile B's remote camera stream.
-    *   [ ] Profile B should display their local camera stream and Profile A's remote camera stream.
-6.  **Verify Call Controls**:
-    *   [ ] Click **Mute mic** on Profile A. Verify the status updates and Profile B's audio track is muted.
-    *   [ ] Click **Camera off** on Profile A. Verify that Profile A's camera feed pauses or goes dark.
-    *   [ ] Click **End call** on either profile. Verify both overlays remove the video elements and return to standard text chat.
+1. Open Chrome and navigate to `chrome://extensions`.
+2. Enable **Developer Mode** (top-right toggle).
+3. Click **Load unpacked** and select the `extension/` folder of this project.
+4. Verify the WatchParty extension appears with no errors. If icons are missing, they appear blank but the extension is otherwise functional.
+5. (Optional) Click the puzzle icon in the toolbar and pin WatchParty for easier access.
 
 ---
 
-## 5. Troubleshooting & Database Validation
+## Step 2 — Open YouTube in Two Chrome Profiles
 
-*   **Status: "Open a supported streaming tab"**: Click on the tab containing your active video player first, then open the extension popup. The popup targets whichever tab is active in the current window.
-*   **Status: "waiting for video"**: Make sure you have clicked play at least once on the streaming site so that the site initializes its HTML5 `<video>` element.
-*   **Firebase Failures**: If rooms do not connect or chat messages fail to send, confirm that Anonymous Authentication and Realtime Database are enabled in your console and that your rules are updated.
-*   **WebRTC Fails to Connect**: The default setup uses Google's public STUN server. If you are behind symmetric corporate firewalls or NATs, WebRTC connection states might time out. A dedicated TURN server would be required.
+1. In Chrome, click your profile avatar (top-right) and create a second Chrome profile if you don't already have one.
+2. Load the WatchParty extension in the second profile the same way as Step 1.
+3. In **both** profiles, navigate to the same YouTube video URL (e.g., any public YouTube video).
+4. Let the video load until it is ready to play (thumbnail → playable state).
+
+---
+
+## Step 3 — Create a Room (Profile A)
+
+1. In Profile A, click the WatchParty extension icon to open the popup.
+2. Set a **Display name** (e.g., "Alice").
+3. Click **Create room**.
+4. Verify:
+   - [ ] The popup switches to "in room" view — Create/Join inputs are hidden.
+   - [ ] A room code badge (e.g., `ABC123`) appears and shows a 📋 copy icon.
+   - [ ] Status pill reads **Connected**.
+   - [ ] The floating on-page overlay appears on the YouTube tab with the room code in the header.
+   - [ ] Overlay shows `Platform: YouTube` and `Sync: Sync ready on YouTube.`.
+   - [ ] Browser developer console shows no errors.
+
+---
+
+## Step 4 — Join a Room (Profile B)
+
+1. In Profile A, click the room code badge to copy it to clipboard.
+2. In Profile B, click the WatchParty extension icon.
+3. Set a **Display name** (e.g., "Bob").
+4. Paste the code in the **Join room** field and click **Join**.
+5. Verify:
+   - [ ] Profile B popup switches to "in room" view with the same room code.
+   - [ ] Profile B overlay appears on the YouTube tab.
+   - [ ] Status reads **Connected** in Profile B.
+
+---
+
+## Step 5 — Test Play Sync
+
+1. Pause the video in Profile A before starting.
+2. Click **Play** in Profile A.
+3. Verify:
+   - [ ] Profile B's video starts playing within ~1 second.
+   - [ ] Overlay sync status briefly shows `Applied playing from room.` on Profile B.
+
+---
+
+## Step 6 — Test Pause Sync
+
+1. While both videos are playing, click **Pause** in Profile A.
+2. Verify:
+   - [ ] Profile B's video pauses within ~1 second.
+   - [ ] Overlay sync status briefly shows `Applied paused from room.` on Profile B.
+
+---
+
+## Step 7 — Test Seek Sync
+
+1. In Profile A, drag the YouTube timeline bar to a different position (seek).
+2. Verify:
+   - [ ] Profile B's player jumps to the same timestamp within ~2 seconds.
+3. Try from Profile B: seek to a different position.
+4. Verify:
+   - [ ] Profile A's player jumps to match Profile B's seek.
+
+---
+
+## Step 8 — Test Chat
+
+1. In Profile A popup, type a message in the chat box and click **Send** (or press Enter).
+2. Verify:
+   - [ ] The message appears in Profile A's popup chat with Alice's display name.
+   - [ ] The message appears in Profile B's popup chat AND in the on-page overlay chat.
+3. Reply from Profile B.
+4. Verify:
+   - [ ] The reply appears in Profile A's popup and overlay.
+
+---
+
+## Step 9 — Test 2-Person WebRTC Call
+
+1. In Profile A popup (while in room), click **Start call**.
+2. Browser will request camera and microphone permissions — click **Allow**.
+3. In Profile B popup, click **Start call**.
+4. Browser will request permissions — click **Allow**.
+5. Verify:
+   - [ ] Profile A overlay shows its local camera feed and Profile B's remote video.
+   - [ ] Profile B overlay shows its local camera feed and Profile A's remote video.
+   - [ ] Call status shows `Call: connected` in both overlays.
+   - [ ] Overlay call controls switch: **Start call** hidden, **End call / Mute mic / Camera off** visible.
+6. Click **Mute mic** in Profile A.
+   - [ ] Button label changes to **Unmute mic** and turns amber/warning color.
+7. Click **Camera off** in Profile A.
+   - [ ] Button label changes to **Camera on** and turns amber/warning color.
+   - [ ] Profile A's video feed goes dark.
+8. Click **End call** in Profile A.
+   - [ ] Both overlays remove video feeds and return to chat-only view.
+   - [ ] Call status shows `Call ended.`.
+   - [ ] **Start call** button reappears.
+
+---
+
+## Step 10 — Test Leave Room
+
+1. In Profile A popup, click **Leave room**.
+2. Verify:
+   - [ ] Profile A popup returns to "no room" state (Create/Join inputs reappear).
+   - [ ] Profile A's on-page overlay disappears from the YouTube tab.
+   - [ ] Status reads **Disconnected**.
+3. Confirm Profile B is still in the room.
+   - [ ] Profile B's overlay still shows the room code and sync status.
+
+---
+
+## Step 11 — Check Console for Errors
+
+1. Right-click the WatchParty extension icon → **Inspect popup** (or open DevTools on the streaming tab).
+2. Open the **Console** tab.
+3. Verify:
+   - [ ] No red errors related to WatchParty scripts.
+   - [ ] No `TypeError`, `ReferenceError`, or undefined property errors from `firebase.js`, `content.js`, `ui.js`, `webrtc.js`, `sync.js`, or `chat.js`.
+   - [ ] Firebase auth and Realtime Database calls show `200 OK` (or no errors).
+
+---
+
+## Known Limitations (Do Not Report as Bugs)
+
+- **Netflix, Disney+, Prime Video, Hulu, Max, Paramount+**: Sync relies on the platform's HTML5 `<video>` element being accessible to scripts. If the platform blocks programmatic control, the overlay will show `Sync: waiting for a safe HTML5 video element`. This is expected behavior.
+- **WebRTC behind symmetric NAT**: Two users on enterprise/school networks without open UDP ports may fail to connect. A TURN server is not included — this is a known limitation.
+- **Presence drift**: If a tab crashes or the network drops suddenly, the user's "online" status in Firebase may stay stuck until the next session cleans it up.
+- **1-hour token expiry**: Firebase auth tokens expire after 1 hour. The extension auto-refreshes using the stored refresh token, but a very long session without any action may require reopening the popup.
+
+---
+
+## Remaining Manual Setup (Before First Use)
+
+1. Go to [Firebase Console](https://console.firebase.google.com/) → your `watchparty-8c5f9` project.
+2. Enable **Anonymous Authentication** under Build → Authentication → Sign-in method.
+3. Enable **Realtime Database** under Build → Realtime Database.
+4. Paste the rules from `docs/FIREBASE_RULES.md` into the Realtime Database Rules tab and click **Publish**.

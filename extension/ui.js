@@ -13,6 +13,10 @@
     render() {
       if (document.getElementById("watchparty-overlay")) {
         this.root = document.getElementById("watchparty-overlay");
+        // Re-assign element refs in case this instance is new.
+        this.messagesEl = this.root.querySelector('[data-role="chat"]');
+        this.localVideo = this.root.querySelector('[data-role="local-video"]');
+        this.remoteVideo = this.root.querySelector('[data-role="remote-video"]');
         return;
       }
 

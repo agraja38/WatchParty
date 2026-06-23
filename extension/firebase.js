@@ -158,6 +158,7 @@
     const user = await signInAnonymously();
     const url = `${CONFIG.databaseURL}/${encodePath(path)}.json?auth=${encodeURIComponent(user.idToken)}`;
     let cache = undefined;
+    let closed = false;
     try {
       const initial = await fetch(url, { headers: { Accept: "application/json" } });
       if (initial.ok) {
@@ -170,11 +171,13 @@
     const source = new EventSource(url);
 
     source.addEventListener("put", (event) => {
+      if (closed) return;
       const data = JSON.parse(event.data);
       cache = setNestedValue(cache, data.path, data.data);
       callback(cache);
     });
     source.addEventListener("patch", (event) => {
+      if (closed) return;
       const data = JSON.parse(event.data);
       const patch = data.data || {};
       Object.entries(patch).forEach(([key, value]) => {
@@ -186,10 +189,17 @@
       onError?.(new Error(`Firebase stream cancelled: ${event.data || "unknown"}`));
     });
     source.onerror = () => {
-      onError?.(new Error(`Firebase stream interrupted for ${path}`));
+      // SSE errors are transient; the browser will auto-reconnect.
+      // Only surface the error if the source is in a permanently closed state.
+      if (source.readyState === EventSource.CLOSED && !closed) {
+        onError?.(new Error(`Firebase stream closed for ${path}`));
+      }
     };
 
-    return () => source.close();
+    return () => {
+      closed = true;
+      source.close();
+    };
   }
 
   async function setUserPresence(roomId, displayName, online) {

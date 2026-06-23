@@ -151,8 +151,8 @@
     if (!tab?.id) return null;
     try {
       return await chrome.tabs.sendMessage(tab.id, message);
-    } catch (error) {
-      setStatus("Open a supported streaming tab first.");
+    } catch {
+      // Content script not loaded on this tab — return null to let caller handle it.
       return null;
     }
   }

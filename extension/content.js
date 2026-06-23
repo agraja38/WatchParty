@@ -121,7 +121,10 @@
     if (!roomId) return;
     sync?.stop();
     chat?.stop();
-    await webrtc?.end();
+    if (webrtc) {
+      await webrtc.end();
+      webrtc = null;
+    }
     await firebase.leaveRoom(roomId, displayName);
     ui.setRoomStatus("No room joined");
     ui.setSyncStatus("idle");
@@ -145,7 +148,7 @@
       if (message?.type === "WATCHPARTY_LEAVE_ROOM") await leaveRoom();
       if (message?.type === "WATCHPARTY_SEND_CHAT") await chat?.send(message.text);
       if (message?.type === "WATCHPARTY_START_CALL") await startCall();
-      if (message?.type === "WATCHPARTY_END_CALL") await webrtc?.end();
+      if (message?.type === "WATCHPARTY_END_CALL") { await webrtc?.end(); webrtc = null; }
       if (message?.type === "WATCHPARTY_TOGGLE_MUTE") webrtc?.toggleMute();
       if (message?.type === "WATCHPARTY_TOGGLE_CAMERA") webrtc?.toggleCamera();
       if (message?.type === "WATCHPARTY_STATUS") {

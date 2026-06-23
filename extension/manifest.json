@@ -45,8 +45,7 @@
     "https://*.paramountplus.com/*",
     "https://watchparty-8c5f9-default-rtdb.firebaseio.com/*",
     "https://identitytoolkit.googleapis.com/*",
-    "https://securetoken.googleapis.com/*",
-    "https://watchparty-8c5f9-default-rtdb.asia-southeast1.firebasedatabase.app/*"
+    "https://securetoken.googleapis.com/*"
   ],
   "content_scripts": [
     {

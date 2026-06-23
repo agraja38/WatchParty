@@ -39,7 +39,9 @@
     }
 
     stop() {
-      this.boundHandlers.forEach(([video, eventName, handler]) => video.removeEventListener(eventName, handler, true));
+      this.boundHandlers.forEach(([video, eventName, handler]) => {
+        if (video) video.removeEventListener(eventName, handler, true);
+      });
       this.boundHandlers = [];
       this.unsubState?.();
       this.unsubState = null;

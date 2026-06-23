@@ -57,7 +57,13 @@
       this.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       this.localStream.getTracks().forEach((track) => this.pc.addTrack(track, this.localStream));
       this.pc.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => this.remoteStream.addTrack(track));
+        const stream = event.streams?.[0];
+        if (stream) {
+          stream.getTracks().forEach((track) => this.remoteStream.addTrack(track));
+        } else {
+          // Fallback: add track directly to remoteStream when no streams provided.
+          this.remoteStream.addTrack(event.track);
+        }
         this.ui?.setRemoteStream(this.remoteStream);
       };
       this.pc.onicecandidate = (event) => {
@@ -66,7 +72,7 @@
         }
       };
       this.pc.onconnectionstatechange = () => {
-        this.ui?.setCallStatus(`Call: ${this.pc.connectionState}`);
+        if (this.pc) this.ui?.setCallStatus(`Call: ${this.pc.connectionState}`);
       };
     }
 
@@ -108,6 +114,8 @@
 
     async answerOffer(offer) {
       this.handledOfferFrom = offer.from;
+      // createPeer() is called from start() before answerOffer is invoked;
+      // only create a fresh peer if somehow pc is null (e.g. from the signal listener path).
       if (!this.pc) this.createPeer();
       if (this.pc.signalingState !== "stable") return;
       await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
@@ -121,7 +129,6 @@
         displayName: this.getDisplayName(),
         createdAt: Date.now()
       });
-      this.answeredFor = offer.from;
     }
 
     toggleMute() {
