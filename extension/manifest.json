@@ -17,6 +17,9 @@
     "48": "assets/icon48.png",
     "128": "assets/icon128.png"
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://watchparty-8c5f9-default-rtdb.firebaseio.com https://watchparty-8c5f9-default-rtdb.asia-southeast1.firebasedatabase.app"
+  },
   "permissions": [
     "storage",
     "tabs",
@@ -46,6 +49,7 @@
     "https://www.paramountplus.com/*",
     "https://*.paramountplus.com/*",
     "https://watchparty-8c5f9-default-rtdb.firebaseio.com/*",
+    "https://watchparty-8c5f9-default-rtdb.asia-southeast1.firebasedatabase.app/*",
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*"
   ],

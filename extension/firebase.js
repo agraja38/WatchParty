@@ -1,5 +1,6 @@
 (() => {
   const ext = globalThis.browser || globalThis.chrome;
+  const DEBUG = true;
   const CONFIG = {
     apiKey: "AIzaSyBJjaiKbiNcvcf6yH9_VcWhq_NKkYis8dQ",
     authDomain: "watchparty-8c5f9.firebaseapp.com",
@@ -10,10 +11,83 @@
     appId: "1:263561927466:web:68fb491e31bbb8f81bdc53",
     measurementId: "G-7Z0K51QJ0C"
   };
+  const DATABASE_URL_FALLBACKS = [
+    CONFIG.databaseURL,
+    "https://watchparty-8c5f9-default-rtdb.asia-southeast1.firebasedatabase.app"
+  ];
+  let activeDatabaseURL = CONFIG.databaseURL;
 
   const AUTH_KEY = "watchpartyAuth";
   const ROOM_KEY = "watchpartyCurrentRoom";
   const DISPLAY_NAME_KEY = "watchpartyDisplayName";
+
+  function debugLog(...args) {
+    if (DEBUG) console.log(...args);
+  }
+
+  function debugError(...args) {
+    if (DEBUG) console.error(...args);
+  }
+
+  function createFirebaseError(input) {
+    const { code, message, details, source, ...extra } = input || {};
+    const error = new Error(message || "Firebase operation failed");
+    error.code = code || "firebase/unknown";
+    error.details = details || "";
+    error.source = source || "unknown";
+    Object.assign(error, extra);
+    return error;
+  }
+
+  function normalizeAuthCode(raw) {
+    const value = String(raw || "").trim();
+    if (value === "OPERATION_NOT_ALLOWED") return "auth/operation-not-allowed";
+    if (value === "CONFIGURATION_NOT_FOUND") return "auth/configuration-not-found";
+    if (value === "NETWORK_REQUEST_FAILED") return "auth/network-request-failed";
+    if (value) return `auth/${value.toLowerCase().replace(/_/g, "-")}`;
+    return "auth/unknown";
+  }
+
+  function parseJsonSafe(text) {
+    try { return JSON.parse(text); } catch { return null; }
+  }
+
+  function parseAuthError(text, source) {
+    const parsed = parseJsonSafe(text);
+    const message = parsed?.error?.message || parsed?.error || text || "Authentication failed";
+    const code = normalizeAuthCode(parsed?.error?.message);
+    return createFirebaseError({
+      code,
+      source,
+      message: `Firebase Auth error: ${code}`,
+      details: message
+    });
+  }
+
+  function parseDatabaseError(text, source, path) {
+    const parsed = parseJsonSafe(text);
+    const message = parsed?.error || parsed?.error?.message || text || "Database request failed";
+    let code = "database/unknown";
+    if (/permission denied/i.test(message)) code = "database/permission-denied";
+    if (/database lives in a different region|correctUrl/i.test(text)) code = "database/incorrect-url";
+    if (/auth/i.test(message) && /expired|invalid/i.test(message)) code = "database/auth-invalid";
+    return createFirebaseError({
+      code,
+      source,
+      message: `Database error: ${code} (${path})`,
+      details: message,
+      correctUrl: parsed?.correctUrl
+    });
+  }
+
+  function parseNetworkError(error, source) {
+    return createFirebaseError({
+      code: "firebase/network-or-csp",
+      source,
+      message: "Firebase network/CSP error. Check extension console.",
+      details: error?.message || String(error)
+    });
+  }
 
   const storage = {
     async get(keys) {
@@ -30,7 +104,11 @@
     }
   };
 
-  console.log("Firebase app initialized", { projectId: CONFIG.projectId, databaseURL: CONFIG.databaseURL });
+  debugLog("Firebase app initializing");
+  debugLog("Firebase app initialized", { projectId: CONFIG.projectId });
+  debugLog("Auth object created");
+  debugLog("Database object created");
+  debugLog("Database URL being used", activeDatabaseURL);
 
   function cleanPath(path) {
     return String(path || "").replace(/^\/+|\/+$/g, "");
@@ -58,14 +136,22 @@
   }
 
   async function refreshIdToken(cached) {
-    const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${CONFIG.apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(cached.refreshToken)}`
-    });
+    debugLog("Anonymous sign-in starting (refresh token)");
+    let response;
+    try {
+      response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${CONFIG.apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(cached.refreshToken)}`
+      });
+    } catch (error) {
+      const parsedError = parseNetworkError(error, "securetoken.googleapis.com");
+      debugError("Anonymous sign-in failed with full error code and message", parsedError.code, parsedError.details);
+      throw parsedError;
+    }
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Firebase token refresh failed: ${text}`);
+      throw parseAuthError(text, "securetoken.googleapis.com");
     }
     const data = await response.json();
     const authUser = {
@@ -79,31 +165,48 @@
   }
 
   async function signInAnonymously() {
+    if (!CONFIG.databaseURL) {
+      throw createFirebaseError({
+        code: "app/missing-database-url",
+        source: "config",
+        message: "Realtime Database URL is missing or incorrect.",
+        details: "databaseURL is empty"
+      });
+    }
     const cached = (await storage.get(AUTH_KEY))[AUTH_KEY];
     if (cached?.idToken && cached?.localId && cached?.expiresAt > Date.now() + 60000) {
-      console.log("Anonymous auth success with uid", cached.localId);
+      debugLog("Anonymous sign-in success with uid", cached.localId);
       return cached;
     }
     if (cached?.refreshToken) {
       try {
         const refreshed = await refreshIdToken(cached);
-        console.log("Anonymous auth success with uid", refreshed.localId);
+        debugLog("Anonymous sign-in success with uid", refreshed.localId);
         return refreshed;
       } catch (_) {
         // Fall through to a new anonymous sign-up if refresh fails.
       }
     }
 
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${CONFIG.apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ returnSecureToken: true })
-    });
+    debugLog("Anonymous sign-in starting");
+    let response;
+    try {
+      response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${CONFIG.apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnSecureToken: true })
+      });
+    } catch (error) {
+      const parsedError = parseNetworkError(error, "identitytoolkit.googleapis.com");
+      debugError("Anonymous sign-in failed with full error code and message", parsedError.code, parsedError.details);
+      throw parsedError;
+    }
 
     if (!response.ok) {
       const text = await response.text();
-      console.error("Anonymous auth error", text);
-      throw new Error(`Firebase anonymous auth failed: ${text}`);
+      const parsedError = parseAuthError(text, "identitytoolkit.googleapis.com");
+      debugError("Anonymous sign-in failed with full error code and message", parsedError.code, parsedError.details);
+      throw parsedError;
     }
 
     const data = await response.json();
@@ -114,7 +217,7 @@
       expiresAt: Date.now() + Number(data.expiresIn || 3600) * 1000
     };
     await storage.set({ [AUTH_KEY]: authUser });
-    console.log("Anonymous auth success with uid", authUser.localId);
+    debugLog("Anonymous sign-in success with uid", authUser.localId);
     return authUser;
   }
 
@@ -123,25 +226,37 @@
     return `auth=${encodeURIComponent(user.idToken)}`;
   }
 
-  async function dbUrl(path, query = "") {
+  async function dbUrl(path, query = "", databaseURL = activeDatabaseURL) {
     const auth = await authQuery();
     const suffix = query ? `${auth}&${query}` : auth;
-    return `${CONFIG.databaseURL}/${encodePath(path)}.json?${suffix}`;
+    return `${databaseURL}/${encodePath(path)}.json?${suffix}`;
   }
 
   async function request(path, options = {}, query = "") {
     const url = await dbUrl(path, query);
-    console.debug("Database connected/ref ready", path);
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      }
-    });
+    debugLog("Database connected/ref ready", path);
+    debugLog("Database URL being used", activeDatabaseURL);
+    let response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {})
+        }
+      });
+    } catch (error) {
+      throw parseNetworkError(error, "realtime-database");
+    }
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Firebase database request failed for ${path}: ${text}`);
+      const parsedError = parseDatabaseError(text, "realtime-database", path);
+      if (parsedError.correctUrl && DATABASE_URL_FALLBACKS.includes(parsedError.correctUrl)) {
+        activeDatabaseURL = parsedError.correctUrl;
+        debugLog("Database URL being used", activeDatabaseURL);
+        return request(path, options, query);
+      }
+      throw parsedError;
     }
     if (response.status === 204) return null;
     return response.json();
@@ -165,7 +280,7 @@
 
   async function onValue(path, callback, onError) {
     const user = await signInAnonymously();
-    const url = `${CONFIG.databaseURL}/${encodePath(path)}.json?auth=${encodeURIComponent(user.idToken)}`;
+    const url = `${activeDatabaseURL}/${encodePath(path)}.json?auth=${encodeURIComponent(user.idToken)}`;
     let cache = undefined;
     let closed = false;
     try {
@@ -225,9 +340,12 @@
   }
 
   async function ensureRoom(roomId, displayName) {
-    console.log("Room create attempted", { roomId, displayName: displayName || "Guest" });
+    debugLog("Create room clicked");
+    debugLog("Create room write path", `rooms/${roomId}/users/{uid}`);
+    debugLog("Create room attempted", { roomId, displayName: displayName || "Guest" });
     try {
       const user = await setUserPresence(roomId, displayName, true);
+      debugLog("Create room write path", `rooms/${roomId}/meta`);
       await request(`rooms/${roomId}/meta`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -237,10 +355,10 @@
         })
       });
       await storage.set({ [ROOM_KEY]: roomId, [DISPLAY_NAME_KEY]: displayName || "Guest" });
-      console.log("Room create success", { roomId, userId: user.localId });
+      debugLog("Create room success", { roomId, userId: user.localId });
       return { roomId, userId: user.localId };
     } catch (error) {
-      console.error("Room create error", error);
+      debugError("Create room failed with full Firebase error code and message", error?.code, error?.message, error?.details);
       throw error;
     }
   }

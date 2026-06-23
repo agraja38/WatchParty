@@ -53,6 +53,32 @@ These rules require all readers and writers to be authenticated via Firebase Ano
 
 ---
 
+## Minimal Test Rules (Use For Debugging)
+
+If room creation fails with `permission_denied`, temporarily use these rules to verify auth/write wiring:
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}
+```
+
+Important:
+
+- Anonymous Authentication must be enabled in Firebase Console.
+- Realtime Database must be created (not Firestore only).
+- Rules must be published after editing.
+- If popup status shows `permission_denied` or `database/permission-denied`, rules are wrong or anonymous auth failed.
+
+---
+
 ## Database Schema Reference
 
 For debugging or customized rule development, WatchParty structures database paths as follows:

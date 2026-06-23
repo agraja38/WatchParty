@@ -1,5 +1,6 @@
 (() => {
   const ext = globalThis.browser || globalThis.chrome;
+  const DEBUG = true;
   const firebase = window.WatchPartyFirebase;
   let authUser = null;
   let roomId = null;
@@ -40,6 +41,7 @@
 
   async function init() {
     try {
+      bindEvents();
       setFirebaseState("connecting", "Firebase: Connecting...");
       authUser = await firebase.signInAnonymously();
       setFirebaseState("connected", "Firebase: Connected");
@@ -48,13 +50,12 @@
       els.displayName.value = stored[firebase.DISPLAY_NAME_KEY] || `Guest-${authUser.localId.slice(0, 4)}`;
       updateRoomUi();
       if (roomId) startChat();
-      bindEvents();
       await refreshTabStatus();
     } catch (error) {
       console.error("WatchParty popup init failed", error);
-      setFirebaseState("error", "Firebase: Error");
-      els.platformStatus.textContent = "Open YouTube or a supported streaming site.";
-      els.callStatus.textContent = "Fix Firebase/auth setup, then reopen popup.";
+      setFirebaseState("error", mapFirebaseError(error) || "Firebase: Error");
+      els.platformStatus.textContent = "Room setup does not require a streaming tab.";
+      els.callStatus.textContent = "Fix Firebase/auth setup, then retry Create or Join.";
     }
   }
 
@@ -94,6 +95,8 @@
 
   async function createRoom() {
     try {
+      if (DEBUG) console.log("Create room clicked");
+      await ensureAuth();
       await enterRoom(firebase.createRoomCode());
     } catch (error) {
       handleActionError("Room create failed.", error);
@@ -104,17 +107,26 @@
     const code = els.joinCode.value.trim().toUpperCase();
     if (!code) return setStatus("Enter a room code first.");
     try {
+      await ensureAuth();
       await enterRoom(code);
     } catch (error) {
       handleActionError("Room join failed.", error);
     }
   }
 
+  async function ensureAuth() {
+    if (authUser && firebaseState.status === "connected") return authUser;
+    setFirebaseState("connecting", "Firebase: Connecting...");
+    authUser = await firebase.signInAnonymously();
+    setFirebaseState("connected", "Firebase: Connected");
+    return authUser;
+  }
+
   async function enterRoom(code) {
-    console.log("Room create attempted", { roomId: code, displayName: getDisplayName() });
+    if (DEBUG) console.log("Create room attempted", { roomId: code, displayName: getDisplayName() });
+    await firebase.ensureRoom(code, getDisplayName());
+    if (DEBUG) console.log("Create room success", { roomId: code });
     roomId = code;
-    await firebase.ensureRoom(roomId, getDisplayName());
-    console.log("Room create success", { roomId });
     updateRoomUi();
     startChat();
     const tabResult = await sendToActiveTab({ type: "WATCHPARTY_JOIN_ROOM", roomId, displayName: getDisplayName() });
@@ -145,7 +157,7 @@
       userId: authUser.localId,
       getDisplayName,
       onMessages: renderMessages,
-      onError: (error) => setStatus(error.message)
+      onError: (error) => setStatus(mapFirebaseError(error) || error.message)
     });
     chat.start();
   }
@@ -251,8 +263,8 @@
   }
 
   function setStatus(text) {
-    if (firebaseState.status === "error") {
-      els.connectionStatus.textContent = "Firebase: Error";
+    if (firebaseState.status === "error" && !text.startsWith("Firebase")) {
+      els.connectionStatus.textContent = firebaseState.message || "Firebase: Error";
       return;
     }
     els.connectionStatus.textContent = text.startsWith("Firebase:")
@@ -267,13 +279,59 @@
 
   function handleActionError(prefix, error) {
     console.error(prefix, error);
-    const firebaseError = /Firebase|auth|database/i.test(error?.message || "");
+    const friendly = mapFirebaseError(error);
+    const firebaseError = Boolean(friendly);
     if (firebaseError) {
-      setFirebaseState("error", "Firebase: Error");
-      setStatus("Firebase unavailable. Check auth/database setup.");
+      setFirebaseState("error", friendly);
+      setStatus(friendly);
     } else {
       setStatus(`${prefix} ${error?.message || "Try again."}`);
     }
+  }
+
+  function mapFirebaseError(error) {
+    const code = String(error?.code || "");
+    const message = String(error?.message || "");
+    const details = String(error?.details || "");
+    const merged = `${code} ${message} ${details}`.toLowerCase();
+
+    if (code === "auth/operation-not-allowed" || merged.includes("operation-not-allowed")) {
+      return "Anonymous Authentication is not enabled.";
+    }
+    if (code === "auth/configuration-not-found" || merged.includes("configuration-not-found")) {
+      return "Firebase Auth error: auth/configuration-not-found";
+    }
+    if (code === "database/permission-denied" || merged.includes("permission_denied") || merged.includes("permission denied")) {
+      return "Firebase permission denied. Check Realtime Database rules.";
+    }
+    if (code === "app/missing-database-url" || merged.includes("database url is missing")) {
+      return "Realtime Database URL is missing or incorrect.";
+    }
+    if (code === "database/incorrect-url" || merged.includes("different region") || merged.includes("correcturl")) {
+      return "Realtime Database URL is missing or incorrect.";
+    }
+    if (code === "firebase/network-or-csp" || merged.includes("failed to fetch") || merged.includes("networkerror")) {
+      return "Firebase network/CSP error. Check extension console.";
+    }
+    if (code.startsWith("auth/")) {
+      return `Firebase Auth error: ${code}`;
+    }
+    if (code.startsWith("database/")) {
+      return `Database error: ${code}`;
+    }
+    if (merged.includes("network-request-failed")) {
+      return "Firebase Auth error: auth/network-request-failed";
+    }
+    if (merged.includes("app/no-app")) {
+      return "Firebase Auth error: app/no-app";
+    }
+    if (merged.includes("content security policy") || merged.includes("csp")) {
+      return "Firebase connection blocked by Content Security Policy.";
+    }
+    if (merged.includes("firebase")) {
+      return "Firebase: Error";
+    }
+    return null;
   }
 
   function escapeHtml(value) {

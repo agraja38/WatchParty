@@ -19,21 +19,48 @@ Use this checklist before any release. All steps use YouTube as the primary test
 
 1. Open Firefox and go to `about:debugging#/runtime/this-firefox`.
 2. Click **Load Temporary Add-on** and choose `extension/manifest.json`.
-3. Open a YouTube video tab first (for example `https://www.youtube.com/watch?v=...`).
-4. Pin WatchParty and open the popup from the toolbar.
+3. Pin WatchParty and open the popup from the toolbar. A YouTube tab is not required for room creation.
+4. Click **Create room** before opening any streaming site.
 5. Verify popup width is full and readable (not a thin vertical strip).
 6. Verify all sections are visible: Display Name, Create/Join Room, Chat, and Call controls.
 7. Verify status messages:
    - `Firebase: Connected` appears in the top badge.
    - `Room: Not in room` appears until you create/join.
-   - Page status shows either YouTube readiness or `Open YouTube or a supported streaming site.`
+   - After creating a room without YouTube open, status may show `Room ready. Open YouTube or a supported streaming site.`
 8. In `about:debugging`, click **Inspect** for the extension and check popup console logs:
+   - `Firebase app initializing`
    - `Firebase app initialized`
-   - `Anonymous auth success with uid`
-   - `Room create attempted` / `Room create success` (after creating room)
-9. Open YouTube page DevTools console and verify `WatchParty content script loaded` appears.
-10. Click **Create room** and confirm room status changes to `Room: In room`.
-11. In a second Firefox profile, load the same temporary add-on and join using the room code.
+   - `Auth object created`
+   - `Database object created`
+   - `Database URL being used`
+   - `Anonymous sign-in starting`
+   - `Anonymous sign-in success with uid`
+   - `Create room clicked`
+   - `Create room write path`
+   - `Create room success`
+9. Open Firebase Realtime Database and verify the room exists under `rooms/{roomId}`.
+10. Open a YouTube video tab and refresh it after loading the temporary add-on.
+11. Open YouTube page DevTools console and verify `WatchParty content script loaded` appears.
+12. Reopen the popup and confirm playback sync status targets the YouTube tab.
+13. In a second Firefox profile, load the same temporary add-on and join using the room code.
+14. If room creation fails, copy the exact Firebase error from popup and extension console.
+
+### Firefox Firebase Debug Loop
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Click **Inspect** under WatchParty extension to open extension console.
+3. Open popup and click **Create room**.
+4. Capture these log lines:
+   - `Anonymous sign-in starting`
+   - `Anonymous sign-in failed with full error code and message` (if it fails)
+   - `Create room failed with full Firebase error code and message` (if it fails)
+5. If you see `permission_denied` or `database/permission-denied`, publish/update rules in Realtime Database and retry **Create room**.
+6. If you see `auth/operation-not-allowed`, enable Anonymous Authentication.
+7. If you see `auth/configuration-not-found`, confirm the Firebase project and API key match.
+8. If you see `auth/network-request-failed`, check network access and extension console errors.
+9. If you see `app/no-app` or `missing databaseURL`, reload the temporary add-on and inspect `firebase.js`.
+10. If you see `blocked by Content Security Policy`, confirm `manifest.json` allows `identitytoolkit.googleapis.com`, `securetoken.googleapis.com`, and both Realtime Database hosts.
+11. If you see `Could not establish connection. Receiving end does not exist.`, open or refresh YouTube; room creation can still work without that tab.
 
 ---
 
@@ -199,3 +226,5 @@ Use this checklist before any release. All steps use YouTube as the primary test
 - If Firefox popup is narrow, remove and re-load the temporary add-on from `about:debugging` so updated popup CSS is applied.
 - If popup shows `Firebase: Error`, inspect the extension console for `Anonymous auth error` and verify `identitytoolkit.googleapis.com`, `securetoken.googleapis.com`, and Realtime Database hosts are reachable.
 - If popup cannot detect a YouTube tab, refresh the YouTube page after loading the temporary add-on so content scripts inject.
+- Common Firebase error codes to check: `auth/operation-not-allowed`, `auth/configuration-not-found`, `database/permission-denied`, `auth/network-request-failed`, `app/no-app`.
+- If you see `Could not establish connection. Receiving end does not exist.`, refresh the YouTube tab so content scripts re-inject.
